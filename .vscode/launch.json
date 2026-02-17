@@ -1,0 +1,22 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Briefing Service",
+      "type": "python",
+      "request": "launch",
+      "module": "src.services.briefing_service",
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false
+    },
+    {
+      "name": "FastAPI Dev",
+      "type": "python",
+      "request": "launch",
+      "module": "uvicorn",
+      "args": ["src.main:app", "--reload"],
+      "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false
+    }
+  ]
+}
