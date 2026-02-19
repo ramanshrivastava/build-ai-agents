@@ -145,7 +145,7 @@ curl -s https://api.anthropic.com/v1/messages \
 
 **ASCII Diagrams**: Architecture flows, data structures, and protocol sequences use text-based diagrams.
 
-**Mermaid Diagrams**: Flowcharts and sequence diagrams use fenced `mermaid` code blocks. See the infra-arch `MERMAID-CHEATSHEET.md` for syntax reference.
+**Mermaid Diagrams**: Flowcharts and sequence diagrams use fenced `mermaid` code blocks. See [`docs/tooling/MERMAID-CHEATSHEET.md`](../tooling/MERMAID-CHEATSHEET.md) for syntax reference.
 
 ### AI Doctor Callouts
 

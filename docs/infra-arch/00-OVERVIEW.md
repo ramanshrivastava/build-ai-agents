@@ -44,7 +44,7 @@ You do NOT need prior Kubernetes experience. These docs start from first princip
 | **10-NGINX-PROXIES-AND-INGRESS.md** | Nginx, Proxies & Ingress | Web servers vs app servers, nginx deep dive, Ingress controllers, VM-to-K8s pattern shift |
 | **11-SECURITY-DISCOVERY-AND-WHY-K8S.md** | Security, Discovery & Why K8s | VM vs K8s tradeoffs, 5-layer security model, service discovery, deployment platform comparison |
 | **12-DEPLOYING-ALONGSIDE-PORTFOLIO.md** | Deploying Alongside a Portfolio | Subdomain architecture, deployment target comparison, managed database internals (VMs vs K8s) |
-| **MERMAID-CHEATSHEET.md** | Mermaid Diagramming Cheatsheet | Quick reference for creating architecture diagrams — syntax, gotchas, 19 diagram types with infra-themed examples |
+| **[MERMAID-CHEATSHEET.md](../tooling/MERMAID-CHEATSHEET.md)** | Mermaid Diagramming Cheatsheet | Quick reference for creating architecture diagrams — syntax, gotchas, 19 diagram types with infra-themed examples (moved to `docs/tooling/`) |
 
 **Suggested path for first-time readers**: Read 00 → 01 → 02 → 03 in sequence to build foundational understanding. Then read 04 (tools) and 05 (app mapping) to see how theory applies to AI Doctor. Read 06 when ready to implement CI/CD. Read 07 for advanced planning. Read 09 for local K8s testing and IaC tool selection. Read 10 to understand how nginx, reverse proxies, and Ingress controllers fit together in K8s deployments. Read 11 for security hardening, service discovery, and an honest comparison of when K8s is (and is not) the right tool. Read 12 for real-world deployment decisions (deploying alongside a portfolio, managed database internals, cost-optimized architecture). Use 08 for self-assessment and knowledge validation.
 
