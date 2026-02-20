@@ -1,6 +1,6 @@
 # Transformer Architecture — How the Model Actually Works
 
-**Part 6 of 7: Agent Architecture & AI Model Internals Series**
+**Part 6 of 8: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -924,5 +924,5 @@ This is why MoE models are "large but fast" — Mixtral 8×7B has 47B total para
 
 ---
 
-*Part 6 of 7: Agent Architecture & AI Model Internals Series*
+*Part 6 of 8: Agent Architecture & AI Model Internals Series*
 *AI Doctor Assistant Project*

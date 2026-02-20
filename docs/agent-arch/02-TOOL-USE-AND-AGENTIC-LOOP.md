@@ -1,6 +1,6 @@
 # Tool Use and the Agentic Loop
 
-**Part 3 of 7: Agent Architecture & AI Model Internals Series**
+**Part 3 of 8: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---

@@ -1,6 +1,6 @@
 # Anthropic API Fundamentals
 
-**Part 1 of 7: Agent Architecture & AI Model Internals Series**
+**Part 1 of 8: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
