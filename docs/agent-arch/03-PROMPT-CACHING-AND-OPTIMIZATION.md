@@ -1,6 +1,6 @@
 # Prompt Caching and Optimization
 
-**Part 4 of 7: Agent Architecture & AI Model Internals Series**
+**Part 4 of 8: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -876,5 +876,5 @@ The next document in the series, **[04-MCP-AND-A2A-PROTOCOLS.md](./04-MCP-AND-A2
 
 ---
 
-*Part 4 of 7: Agent Architecture & AI Model Internals Series*
+*Part 4 of 8: Agent Architecture & AI Model Internals Series*
 *AI Doctor Assistant Project*

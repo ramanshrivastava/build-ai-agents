@@ -63,6 +63,7 @@ You do **not** need:
 | **04-MCP-AND-A2A-PROTOCOLS.md** | MCP & A2A Protocols | Model Context Protocol, Agent2Agent, tool/agent communication standards |
 | **05-TRANSFORMER-ARCHITECTURE.md** | Transformer Architecture | Tokenization, embeddings, attention mechanism, generation -- full visual treatment |
 | **06-TRAINING-AND-RUNNING-MODELS.md** | Training & Running Models | Pre-training, RLHF, Constitutional AI, Ollama, quantization, local inference |
+| **07-CLAUDE-AGENT-SDK.md** | Claude Agent SDK | SDK architecture, query() internals, structured output, error handling, testing, permissions |
 
 ---
 
@@ -73,16 +74,17 @@ You do **not** need:
 **Goal**: Ship applications that use LLM APIs effectively.
 
 ```
-00 → 01 → 02 → 03 → 04
-│    │    │    │    │
-│    │    │    │    └─ MCP/A2A: Connect agents to tools and other agents
-│    │    │    └─ Caching: Cut costs 90% with prompt caching
+00 → 01 → 02 → 07 → 03 → 04
+│    │    │    │    │    │
+│    │    │    │    │    └─ MCP/A2A: Connect agents to tools and other agents
+│    │    │    │    └─ Caching: Cut costs 90% with prompt caching
+│    │    │    └─ Agent SDK: Deep dive into query(), structured output, testing
 │    │    └─ Tool use: Let Claude call functions and APIs
 │    └─ API basics: Authentication, messages, models, parameters
 └─ This overview
 ```
 
-**Time estimate**: 4-6 hours of focused reading. Run the `scripts/` examples as you go.
+**Time estimate**: 5-7 hours of focused reading. Run the `scripts/` examples as you go.
 
 ### Understanding AI Path (How It Works)
 
@@ -103,19 +105,20 @@ You do **not** need:
 **Goal**: Validate AI/ML engineering knowledge with both practical API skills and theoretical depth.
 
 ```
-01 → 02 → 05 → 06
-│    │    │    │
-│    │    │    └─ Training pipeline: Pre-training → RLHF → deployment
-│    │    └─ Architecture: "Explain the transformer" (the most fundamental question)
+01 → 02 → 07 → 05 → 06
+│    │    │    │    │
+│    │    │    │    └─ Training pipeline: Pre-training → RLHF → deployment
+│    │    │    └─ Architecture: "Explain the transformer" (the most fundamental question)
+│    │    └─ Agent SDK: SDK internals, testing, structured output patterns
 │    └─ Tool use: Agentic patterns (core to modern AI system design)
 └─ API fundamentals: Show you can actually build with these systems
 ```
 
-**Time estimate**: 5-7 hours. Focus on the "why" behind each concept.
+**Time estimate**: 6-8 hours. Focus on the "why" behind each concept.
 
 ### Full Sequential Path
 
-Read 00 through 06 in order. Each document builds on the previous. This is the most thorough approach but takes 8-12 hours.
+Read 00 through 07 in order. Each document builds on the previous. This is the most thorough approach but takes 10-14 hours.
 
 ---
 
@@ -175,15 +178,17 @@ These ground abstract concepts in the actual application.
 1. **Read 01** with a terminal open. Run the `scripts/test-tool-call.sh` script to see a real API response.
 2. **Read 02** and run `scripts/test-tool-call-opus-step2.sh` to see the full tool-use round trip.
 3. **Read 03** to understand why caching changes the economics of LLM applications.
-4. **Read 04** when you need to connect agents to external tools or other agents.
-5. **Read 05-06** when you want to understand what happens *inside* the model. These are independent of the API docs.
+4. **Read 07** to understand the Claude Agent SDK in depth -- how `query()` works, structured output, testing, and error handling.
+5. **Read 04** when you need to connect agents to external tools or other agents.
+6. **Read 05-06** when you want to understand what happens *inside* the model. These are independent of the API docs.
 
 ### For Building with LLM APIs
 
 1. Start with **01** for authentication, models, and parameters.
 2. Read **02** to implement tool use (required for most production applications).
-3. Read **03** before going to production -- caching can cut your API bill by 90%.
-4. Read **04** if building multi-agent systems or integrating with MCP-compatible tools.
+3. Read **07** for Claude Agent SDK patterns -- structured output, error handling, testing, permissions.
+4. Read **03** before going to production -- caching can cut your API bill by 90%.
+5. Read **04** if building multi-agent systems or integrating with MCP-compatible tools.
 
 ### For Knowledge Validation
 
@@ -200,6 +205,7 @@ These ground abstract concepts in the actual application.
 - **04**: MCP protocol specification, A2A protocol, tool vs agent distinction
 - **05**: Transformer component reference, attention mechanism walkthrough
 - **06**: Training pipeline stages, quantization types, Ollama commands
+- **07**: SDK architecture, query() parameters, structured output flow, error handling, testing patterns
 
 ---
 
@@ -232,8 +238,9 @@ These documents reflect:
 - **Models**: Claude Opus 4, Claude Sonnet 4.5, Claude Haiku 4.5 (model IDs current as of 2025)
 - **MCP Protocol**: Model Context Protocol specification (2024-2025)
 - **AI Doctor**: V1 complete (FastAPI + React 19 + PostgreSQL), V2 in planning
+- **Claude Agent SDK**: `claude_agent_sdk` Python package (compatible with Python 3.10-3.13)
 
-As Anthropic releases new API versions or models, documents 01-03 may need updates. The transformer architecture (05) and training concepts (06) are stable across model generations.
+As Anthropic releases new API versions or models, documents 01-03 may need updates. Document 07 (Agent SDK) tracks the `claude_agent_sdk` package. The transformer architecture (05) and training concepts (06) are stable across model generations.
 
 ---
 

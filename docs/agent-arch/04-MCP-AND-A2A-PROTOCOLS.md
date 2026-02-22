@@ -1,6 +1,6 @@
 # MCP and A2A Protocols
 
-**Part 5 of 7: Agent Architecture & AI Model Internals Series**
+**Part 5 of 8: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -948,5 +948,5 @@ The next document in the series covers how these concepts apply to building prod
 
 ---
 
-*Part 5 of 7: Agent Architecture & AI Model Internals Series*
+*Part 5 of 8: Agent Architecture & AI Model Internals Series*
 *AI Doctor Assistant Project*
