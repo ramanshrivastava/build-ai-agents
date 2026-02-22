@@ -3,18 +3,6 @@
 > Quick reference for creating diagrams in the infra-arch doc series.
 > Every example is infra/deployment-themed — copy, adapt, use.
 
-### Renderer Compatibility
-
-Not all diagram types work everywhere. Know your tier before choosing:
-
-| Tier | Renders on | Diagram types |
-|------|-----------|---------------|
-| **Universal** | GitHub, VS Code, all renderers | `graph`, `sequenceDiagram`, `erDiagram`, `gantt`, `pie`, `stateDiagram-v2`, `gitGraph` |
-| **Wide** | GitHub, VS Code, most renderers | `mindmap`, `timeline`, `quadrantChart`, `journey`, `C4Context`, `C4Container` |
-| **Beta / Limited** | Mermaid Live Editor only | `architecture-beta`, `zenuml`, `block-beta`, `sankey-beta`, `xychart-beta`, `packet-beta`, `kanban` |
-
-When writing docs for GitHub, stick to Universal or Wide tier. For beta diagrams, always provide a universal fallback.
-
 ---
 
 ## Quick Start
@@ -62,6 +50,9 @@ graph LR
   A -. "async" .-> C["Queue"]
   A == "critical" ==> D["Database"]
   A -- "HTTP 443" --> E["External API"]
+  A -- "HTTP 501" --> F["Internal API"]
+  E -. "logs" .-> L["Logging Service"]
+  F -. "logs" .-> L["Logging Service"]
 ```
 
 | Arrow | Meaning |
@@ -123,6 +114,7 @@ graph LR
   E[("Database (cylinder)")]
   F{{"Hexagon"}}
   G{"Diamond (decision)"}
+  H{{"Hexagon"}}
   I(("Circle"))
   J[/"Flag"/]
 ```
@@ -233,18 +225,18 @@ sequenceDiagram
 
 ## 3. Architecture Diagram (beta)
 
-**When to use:** Cloud infrastructure layouts with service icons. Note: this is a newer Mermaid feature — only works in Mermaid Live Editor and renderers on Mermaid v11+. GitHub does **not** support this yet.
+**When to use:** Cloud infrastructure layouts with service icons. Note: this is a newer Mermaid feature — check renderer support.
 
 ### Basic syntax
 
 ```mermaid
 architecture-beta
-  group gcp(cloud)[Google Cloud Platform]
+  group gcp["Google Cloud Platform"]
 
-  service lb(internet)[Load Balancer] in gcp
-  service fe(server)[React Frontend] in gcp
-  service be(server)[FastAPI Backend] in gcp
-  service db(database)[PostgreSQL] in gcp
+  service lb["Load Balancer"] in gcp
+  service fe["Frontend (React)"] in gcp
+  service be["Backend (FastAPI)"] in gcp
+  service db["PostgreSQL"] in gcp
 
   lb:R --> T:fe
   lb:R --> T:be
@@ -253,13 +245,11 @@ architecture-beta
 
 ### Key syntax rules
 
-- `group id(icon)[Label]` creates a boundary — icon is **required** (e.g., `cloud`, `server`)
-- `service id(icon)[Label]` declares a component — icon is **required** (e.g., `server`, `database`, `disk`, `internet`)
-- Avoid parentheses inside `[Label]` — they conflict with the `(icon)` syntax
+- `group` creates a boundary (like a VPC or cloud region)
+- `service` declares a component
 - `in` places a service inside a group
 - Edge ports: `L` (left), `R` (right), `T` (top), `B` (bottom)
-- Format: `source:PORT --> PORT:target` or `source:PORT -- PORT:target` (undirected)
-- **Renderer support:** Mermaid Live Editor only — GitHub/VS Code may not render this
+- Format: `source:PORT --> PORT:target`
 
 ---
 
@@ -456,34 +446,33 @@ Reading: `PATIENT ||--o{ BRIEFING` = "one patient has zero or many briefings"
 ### Full example: AI Doctor branching strategy
 
 ```mermaid
-gitGraph
+gitgraph
   commit id: "v1.0.0"
-  branch fe-v2
-  checkout fe-v2
-  commit id: "dark-theme"
-  commit id: "motion-animations"
-  commit id: "split-pane"
+  branch "fe/v2"
+  checkout "fe/v2"
+  commit id: "dark theme"
+  commit id: "motion animations"
+  commit id: "split pane"
 
   checkout main
-  branch be-v2
-  checkout be-v2
-  commit id: "agent-SDK"
+  branch "be/v2"
+  checkout "be/v2"
+  commit id: "agent SDK"
   commit id: "streaming"
 
   checkout main
-  merge fe-v2 id: "merge-fe-v2"
-  merge be-v2 id: "merge-be-v2"
+  merge "fe/v2" id: "merge fe/v2"
+  merge "be/v2" id: "merge be/v2"
   commit id: "v2.0.0" tag: "v2.0.0"
 ```
 
 ### Key syntax rules
 
-- `gitGraph` — capital G required (not `gitgraph`)
-- `commit id: "label"` — named commits (avoid spaces in IDs — use hyphens)
+- `commit id: "label"` — named commits
 - `commit tag: "v1.0"` — tagged commits
-- `branch name` — branch names must be simple alphanumeric or hyphenated (no `/` — causes parse errors in most renderers)
+- `branch "name"` — create branch (quotes needed for `/` in name)
 - `checkout` — switch to branch
-- `merge branchName` — merge into current branch
+- `merge "branch"` — merge into current branch
 - `cherry-pick id: "commit-id"` — cherry-pick a commit
 
 ---
@@ -651,39 +640,40 @@ timeline
 
 ---
 
-## 14. ZenUML (Mermaid Live Editor only)
+## 14. Sequence — ZenUML
 
-**When to use:** Code-like alternative to `sequenceDiagram` — uses `{}` blocks, `if/else`, method call syntax. Only renders in [Mermaid Live Editor](https://mermaid.live).
+**When to use:** Alternative sequence diagram syntax — more code-like, less verbose.
 
-Since ZenUML doesn't render on GitHub or VS Code, here's the equivalent auth flow as a standard sequence diagram:
+### Full example: API authentication flow
 
 ```mermaid
-sequenceDiagram
-  actor Doctor
-  participant FE as Frontend
-  participant BE as Backend
-  participant DB as PostgreSQL
+zenuml
+  @Actor Doctor
+  @Boundary Frontend
+  @Control Backend
+  @Database PostgreSQL
+  @Control token
 
-  Doctor->>FE: login(email, password)
-  FE->>BE: POST /auth/login
-  BE->>DB: findUser(email)
-  DB-->>BE: user
-
-  alt valid credentials
-    BE-->>FE: 200 {token: jwt}
-  else invalid credentials
-    BE-->>FE: 401 Unauthorized
-  end
-
-  FE-->>Doctor: Login result
+  Doctor -> Frontend.login(email, password) {
+    Frontend -> Backend.POST("/auth/login") {
+      Backend -> PostgreSQL.findUser(email) {
+        return user
+      }
+      if (user && validPassword) {
+        return {token: jwt}
+      } else {
+        return 401
+      }
+    }
+  }
 ```
 
-### ZenUML syntax reference (for Mermaid Live Editor)
+### Key syntax rules
 
-- `@Actor`, `@Boundary`, `@Control`, `@Database` — stereotypes
-- `Caller -> Receiver.method(args)` — method call syntax
-- `if/else`, `while`, `try/catch` — control flow with `{}` blocks
-- `return value` — response arrows
+- Uses programming-language-like syntax with `{}` blocks
+- Stereotypes: `@Actor`, `@Boundary`, `@Control`, `@Entity`, `@Database`
+- Method call syntax: `Caller -> Receiver.method(args)`
+- `if/else`, `while`, `try/catch` control flow
 
 ---
 
@@ -892,19 +882,19 @@ graph LR
 |-------------|-------------|----------|
 | Flowchart | `graph LR` | Architecture layouts, data flows |
 | Sequence | `sequenceDiagram` | Request/response, auth flows |
-| Architecture | `architecture-beta` | Cloud infra with icons (Mermaid Live only) |
+| Architecture | `architecture-beta` | Cloud infra with icons |
 | Block | `block-beta` | Infrastructure layouts |
 | C4 Context | `C4Context` | System-level views |
 | C4 Container | `C4Container` | Container-level views |
 | State | `stateDiagram-v2` | CI/CD states, pod lifecycle |
 | ER | `erDiagram` | Database schemas |
-| Gitgraph | `gitGraph` | Branch strategy |
+| Gitgraph | `gitgraph` | Branch strategy |
 | Gantt | `gantt` | Deployment timelines |
 | Pie | `pie` | Cost breakdowns |
 | Quadrant | `quadrantChart` | Decision matrices |
 | Mindmap | `mindmap` | Concept mapping |
 | Timeline | `timeline` | Version history |
-| ZenUML | `zenuml` | Code-like sequence diagrams (Mermaid Live only) |
+| ZenUML | `zenuml` | Code-like sequence diagrams |
 | XY Chart | `xychart-beta` | Performance charts |
 | Sankey | `sankey-beta` | Flow/cost visualization |
 | User Journey | `journey` | UX flow mapping |
@@ -913,18 +903,16 @@ graph LR
 
 ---
 
-## Common Mistakes
+## Common Mistakes (from this doc series)
 
-Real errors found while writing the infra-arch docs:
+These are real errors found in the infra-arch docs:
 
 | Mistake | Fix |
 |---------|-----|
-| `graphLR` | `graph LR` (space after diagram type) |
-| `gitgraph` | `gitGraph` (capital G) |
-| `# comment` | `%% comment` (Mermaid uses `%%`, not `#`) |
-| `A[Cloud Run (BE)]` | `A["Cloud Run (BE)"]` (quote labels with special chars) |
-| `service lb["Label"]` | `service lb(icon)[Label]` (architecture-beta needs icon type) |
-| Branch names with `/` | Use hyphens: `fe-v2` not `fe/v2` |
+| `graphLR` | `graph LR` (add space) |
+| `# this is a comment` | `%% this is a comment` |
+| `A --> some text [here]` | `A["some text (here)"] --> B["there"]` |
+| `Node with / slash` | `A["Node with / slash"]` |
+| Unquoted parens in labels | Always quote: `["label (detail)"]` |
 | Missing `end` after subgraph | Every `subgraph` needs a matching `end` |
 | Spaces in node IDs | Use camelCase or hyphens: `myNode`, `my-node` |
-| Using beta diagrams on GitHub | Stick to universal tier (see top of doc) |
