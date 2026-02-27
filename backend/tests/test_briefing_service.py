@@ -91,12 +91,13 @@ async def _async_iter(items):
         yield item
 
 
-# --- Tests ---
+# --- Tests (V1 fallback path — Qdrant unavailable) ---
 
 
+@patch("src.services.briefing_service._qdrant_available", return_value=False)
 @patch("src.services.briefing_service.query")
-async def test_generate_briefing_success(mock_query, fake_patient):
-    """Happy path: valid structured output → BriefingResponse."""
+async def test_generate_briefing_success(mock_query, _mock_qdrant, fake_patient):
+    """Happy path (V1): valid structured output → BriefingResponse."""
     msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
     mock_query.return_value = _async_iter([msg])
 
@@ -110,8 +111,9 @@ async def test_generate_briefing_success(mock_query, fake_patient):
     assert result.generated_at is not None
 
 
+@patch("src.services.briefing_service._qdrant_available", return_value=False)
 @patch("src.services.briefing_service.query")
-async def test_generate_briefing_agent_error(mock_query, fake_patient):
+async def test_generate_briefing_agent_error(mock_query, _mock_qdrant, fake_patient):
     """Agent returns is_error=True → BriefingGenerationError(AGENT_ERROR)."""
     msg = _make_result_message(is_error=True, result="Model refused to answer")
     mock_query.return_value = _async_iter([msg])
@@ -123,10 +125,10 @@ async def test_generate_briefing_agent_error(mock_query, fake_patient):
     assert "Model refused to answer" in exc_info.value.message
 
 
+@patch("src.services.briefing_service._qdrant_available", return_value=False)
 @patch("src.services.briefing_service.query")
-async def test_generate_briefing_no_result(mock_query, fake_patient):
+async def test_generate_briefing_no_result(mock_query, _mock_qdrant, fake_patient):
     """No ResultMessage yielded → BriefingGenerationError(NO_RESULT)."""
-    # Yield nothing — simulates agent producing no result
     mock_query.return_value = _async_iter([])
 
     with pytest.raises(BriefingGenerationError) as exc_info:
@@ -135,8 +137,9 @@ async def test_generate_briefing_no_result(mock_query, fake_patient):
     assert exc_info.value.code == "NO_RESULT"
 
 
+@patch("src.services.briefing_service._qdrant_available", return_value=False)
 @patch("src.services.briefing_service.query")
-async def test_generate_briefing_cli_not_found(mock_query, fake_patient):
+async def test_generate_briefing_cli_not_found(mock_query, _mock_qdrant, fake_patient):
     """CLINotFoundError → BriefingGenerationError(CLI_NOT_FOUND)."""
     from claude_agent_sdk import CLINotFoundError
 
@@ -146,3 +149,24 @@ async def test_generate_briefing_cli_not_found(mock_query, fake_patient):
         await generate_briefing(fake_patient)
 
     assert exc_info.value.code == "CLI_NOT_FOUND"
+
+
+# --- Tests (RAG path — Qdrant available) ---
+
+
+@patch("src.services.briefing_service._qdrant_available", return_value=True)
+@patch("src.agents.briefing_agent.query")
+async def test_generate_briefing_delegates_to_rag(
+    mock_query, _mock_qdrant, fake_patient
+):
+    """When Qdrant is available, delegates to RAG agent."""
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    result = await generate_briefing(fake_patient)
+
+    assert result.generated_at is not None
+    # Verify the RAG agent was called (max_turns=4)
+    call_kwargs = mock_query.call_args
+    options = call_kwargs.kwargs.get("options") or call_kwargs[1].get("options")
+    assert options.max_turns == 4
