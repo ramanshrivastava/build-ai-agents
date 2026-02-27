@@ -30,6 +30,8 @@
 | Build agent tools (V2) | V1: no tools, no `@tool` decorator |
 | SSE streaming (V2) | V1: sync POST, frontend spinner |
 | Langfuse observability (V2) | V1: no observability |
+| `query(prompt="string", ...)` with MCP tools | `query(prompt=async_iter, ...)` — string prompts close stdin, breaking MCP tool communication |
+| Ignore `BaseExceptionGroup` from SDK | Catch and check for `CLIConnectionError` during shutdown — SDK task group wraps it |
 
 ## Testing Conventions
 

@@ -79,8 +79,45 @@ cd backend && uv run ruff check . --fix
 - Use `from __future__ import annotations` for forward refs
 - Use Pydantic v2 patterns (`model_validate`, not `parse_obj`)
 - Import from `claude_agent_sdk`, never from `anthropic` directly
-- No agent tools in V1 — no `@tool` decorator, no MCP server
 - No Langfuse observability in V1
+
+## Claude Agent SDK Gotchas
+
+### String prompts break MCP tool communication
+
+When using `create_sdk_mcp_server()` with tools, you **must** pass a streaming prompt (async iterator) to `query()`, not a plain string. The SDK closes stdin immediately for string prompts, which prevents MCP tool responses from being written back. Streaming mode keeps stdin open for bidirectional communication.
+
+```python
+# WRONG — tools will silently fail
+async for msg in query(prompt="patient data...", options=options):
+    ...
+
+# RIGHT — wrap as async iterator to keep stdin open
+async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
+    yield {"type": "user", "message": {"role": "user", "content": text}}
+
+async for msg in query(prompt=_as_stream(patient_json), options=options):
+    ...
+```
+
+See `src/agents/briefing_agent.py:201-208` for the production implementation.
+
+### CLIConnectionError in ExceptionGroup during shutdown
+
+The SDK's internal task group can wrap `CLIConnectionError` in a `BaseExceptionGroup` during `query.close()` — a race between transport shutdown and in-flight control request handlers. If you already have a valid `ResultMessage`, this error is safe to ignore. Otherwise, re-raise it.
+
+```python
+except BaseExceptionGroup as eg:
+    cli_errors = eg.subgroup(CLIConnectionError)
+    if cli_errors and result is not None:
+        logger.warning("CLIConnectionError after result (ignoring): %s", cli_errors.exceptions[0])
+    elif cli_errors:
+        raise BriefingGenerationError(code="CLI_CONNECTION_ERROR", message=str(cli_errors.exceptions[0]))
+    else:
+        raise
+```
+
+See `src/agents/briefing_agent.py:289-305` for the production implementation.
 
 ## Environment Variables
 
