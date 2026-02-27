@@ -321,6 +321,7 @@ description: React frontend development patterns for AI Doctor Assistant
 ```
 
 **Content:**
+
 - React 18+ with TypeScript strict mode
 - Vite for build tooling
 - Component patterns: functional + hooks only
@@ -344,6 +345,7 @@ description: FastAPI backend patterns for AI Doctor Assistant
 ```
 
 **Content:**
+
 - FastAPI with async/await patterns
 - Pydantic v2 for validation (use `model_validate`, not `parse_obj`)
 - SQLAlchemy 2.0 with async sessions
@@ -367,7 +369,8 @@ description: Claude Agent SDK patterns and best practices
 ```
 
 **Content:**
-- Use `claude_agent_sdk` package (pip install claude-agent-sdk)
+
+- Use `claude_agent_sdk` package ( uv pip install claude-agent-sdk)
 - Create custom tools via `@tool` decorator + `create_sdk_mcp_server()`
 - Tools naming: `mcp__<server>__<tool_name>`
 - Use `output_format` with JSON schema for structured outputs
@@ -391,6 +394,7 @@ description: Architecture guidance for AI Doctor Assistant
 ```
 
 **Content:**
+
 - Keep services loosely coupled
 - API versioning: `/api/v1/...`
 - Error handling: structured error responses with codes
@@ -412,6 +416,7 @@ description: Code review and refactoring guidelines
 ```
 
 **Content:**
+
 - Never change code without reading it first
 - Run tests before and after changes
 - Check for breaking API changes
@@ -491,8 +496,9 @@ description: Code review and refactoring guidelines
 
 ## Project Structure
 ```
+
 src/
-├── __init__.py
+├── **init**.py
 ├── main.py              # FastAPI app entry
 ├── config.py            # Settings, env vars
 ├── models/              # Pydantic models
@@ -503,6 +509,7 @@ src/
 │   └── hooks.py         # Langfuse hooks
 ├── routers/             # API routes
 └── database.py          # SQLAlchemy setup
+
 ```
 
 ## Running the Server
@@ -511,25 +518,30 @@ uv run uvicorn src.main:app --reload
 ```
 
 ## Running Tests
+
 ```bash
 uv run pytest
 ```
 
 ## Adding Dependencies
+
 ```bash
 uv add <package>
 uv add --dev <dev-package>
 ```
 
 ## Key Files to Know
+
 - `src/agents/tools.py` - Custom tools for BriefingAgent
 - `src/services/flag_analyzer.py` - Deterministic rule-based flags
 - `src/models/briefing.py` - Pydantic output models
 
 ## Don't Forget
+
 - Always use async/await for I/O operations
 - Validate all LLM output against Pydantic models
 - Tag flags with source: "rule" or "ai"
+
 ```
 
 ### Frontend-Specific CLAUDE.md
@@ -541,6 +553,7 @@ uv add --dev <dev-package>
 
 ## Project Structure
 ```
+
 src/
 ├── components/
 │   ├── PatientList/
@@ -552,6 +565,7 @@ src/
 │   └── api.ts
 ├── types/
 └── App.tsx
+
 ```
 
 ## Running the Dev Server
@@ -560,20 +574,24 @@ npm run dev
 ```
 
 ## Running Tests
+
 ```bash
 npm test
 ```
 
 ## Key Patterns
+
 - Use React Query for server state (`useQuery`, `useMutation`)
 - Co-locate tests with components (Component.test.tsx)
 - Use Tailwind CSS for styling
 - Type all props with interfaces
 
 ## API Integration
+
 - All API calls go through `services/api.ts`
 - Use the `useBriefing` hook for patient briefings
 - Handle loading/error states in components
+
 ```
 
 ---
@@ -657,6 +675,7 @@ uv run ruff format .
 ```
 
 **What this does:**
+
 - After any file Write or Edit, automatically runs ruff to format Python code
 - Uses `uv run` to run ruff in the correct environment
 - The `|| true` ensures the hook doesn't fail the operation if ruff has issues

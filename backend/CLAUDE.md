@@ -8,17 +8,22 @@ This is part of a monorepo. Before starting work, read:
 
 Start Claude Code from repo root to ensure visibility into all docs.
 
-## Project Structure (V1)
+## Project Structure
 
 ```
 src/
 ├── __init__.py
 ├── main.py              # FastAPI app, CORS, lifespan, routers
-├── config.py            # pydantic-settings config
+├── config.py            # pydantic-settings config (+ Qdrant, GCP settings)
 ├── database.py          # SQLAlchemy async setup
+├── agents/
+│   ├── __init__.py
+│   ├── briefing_agent.py    # RAG-augmented agent (MCP server, max_turns=4)
+│   └── tools.py             # @tool search_clinical_guidelines
 ├── models/
 │   ├── __init__.py
 │   ├── orm.py           # SQLAlchemy Patient model
+│   ├── rag.py           # DocumentChunk, RetrievalResult
 │   └── schemas.py       # Pydantic request/response/error models
 ├── routers/
 │   ├── __init__.py
@@ -26,11 +31,13 @@ src/
 │   └── briefings.py     # Briefing endpoint
 └── services/
     ├── __init__.py
-    ├── patient_service.py   # Patient CRUD
-    └── briefing_service.py  # Agent orchestration (no tools in V1)
+    ├── patient_service.py       # Patient CRUD
+    ├── briefing_service.py      # Routes to RAG agent or V1 fallback
+    ├── rag_service.py           # Embed + search Qdrant
+    └── document_processor.py    # Markdown parsing + chunking
 ```
 
-> **V1 Note:** No `agents/` directory. Briefing logic lives in `services/briefing_service.py` using `claude_agent_sdk.query()` with structured output. No tools, no hooks.
+> **RAG Architecture:** `briefing_service.py` checks Qdrant availability. If up, delegates to `agents/briefing_agent.py` (multi-turn, `max_turns=4`, with `search_clinical_guidelines` tool). If Qdrant is down, falls back to V1 single-turn agent (no tools, `max_turns=2`).
 
 ## Running the Server
 
@@ -72,8 +79,45 @@ cd backend && uv run ruff check . --fix
 - Use `from __future__ import annotations` for forward refs
 - Use Pydantic v2 patterns (`model_validate`, not `parse_obj`)
 - Import from `claude_agent_sdk`, never from `anthropic` directly
-- No agent tools in V1 — no `@tool` decorator, no MCP server
 - No Langfuse observability in V1
+
+## Claude Agent SDK Gotchas
+
+### String prompts break MCP tool communication
+
+When using `create_sdk_mcp_server()` with tools, you **must** pass a streaming prompt (async iterator) to `query()`, not a plain string. The SDK closes stdin immediately for string prompts, which prevents MCP tool responses from being written back. Streaming mode keeps stdin open for bidirectional communication.
+
+```python
+# WRONG — tools will silently fail
+async for msg in query(prompt="patient data...", options=options):
+    ...
+
+# RIGHT — wrap as async iterator to keep stdin open
+async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
+    yield {"type": "user", "message": {"role": "user", "content": text}}
+
+async for msg in query(prompt=_as_stream(patient_json), options=options):
+    ...
+```
+
+See `src/agents/briefing_agent.py:201-208` for the production implementation.
+
+### CLIConnectionError in ExceptionGroup during shutdown
+
+The SDK's internal task group can wrap `CLIConnectionError` in a `BaseExceptionGroup` during `query.close()` — a race between transport shutdown and in-flight control request handlers. If you already have a valid `ResultMessage`, this error is safe to ignore. Otherwise, re-raise it.
+
+```python
+except BaseExceptionGroup as eg:
+    cli_errors = eg.subgroup(CLIConnectionError)
+    if cli_errors and result is not None:
+        logger.warning("CLIConnectionError after result (ignoring): %s", cli_errors.exceptions[0])
+    elif cli_errors:
+        raise BriefingGenerationError(code="CLI_CONNECTION_ERROR", message=str(cli_errors.exceptions[0]))
+    else:
+        raise
+```
+
+See `src/agents/briefing_agent.py:289-305` for the production implementation.
 
 ## Environment Variables
 

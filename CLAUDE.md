@@ -30,6 +30,8 @@
 | Build agent tools (V2) | V1: no tools, no `@tool` decorator |
 | SSE streaming (V2) | V1: sync POST, frontend spinner |
 | Langfuse observability (V2) | V1: no observability |
+| `query(prompt="string", ...)` with MCP tools | `query(prompt=async_iter, ...)` — string prompts close stdin, breaking MCP tool communication |
+| Ignore `BaseExceptionGroup` from SDK | Catch and check for `CLIConnectionError` during shutdown — SDK task group wraps it |
 
 ## Testing Conventions
 
@@ -93,6 +95,8 @@ build-ai-agents/
 Read these before starting work:
 - `docs/SCOPE-V1.md` — Current iteration plan and task breakdown
 - `docs/ARCHITECTURE.md` — Full system architecture vision (includes V2+ features)
+- `docs/RAG-ARCH.md` — RAG system architecture, requirements, and implementation phases
+- `docs/server-arch/` — Async server architecture series (event loop, FastAPI, RAG patterns)
 
 ### Running Commands
 

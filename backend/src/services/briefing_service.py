@@ -1,4 +1,4 @@
-"""Briefing generation service using Claude Agent SDK."""
+"""Briefing generation service — delegates to RAG agent with V1 fallback."""
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ import json
 import logging
 
 from claude_agent_sdk import (
+    AssistantMessage,
     CLIConnectionError,
     CLIJSONDecodeError,
     CLINotFoundError,
@@ -22,7 +23,8 @@ from src.models.schemas import BriefingResponse, PatientBriefing
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """\
+# V1 system prompt (fallback when Qdrant is unavailable)
+V1_SYSTEM_PROMPT = """\
 You are a clinical decision support assistant preparing pre-consultation \
 briefings for physicians. Your role is to analyze a patient record and \
 produce a structured briefing that helps the doctor prepare for the visit.
@@ -72,6 +74,21 @@ class BriefingGenerationError(Exception):
         super().__init__(message)
 
 
+def _qdrant_available() -> bool:
+    """Check if Qdrant is reachable. Returns False on any error."""
+    try:
+        from src.services.rag_service import get_qdrant_client
+
+        client = get_qdrant_client()
+        collections = client.get_collections()
+        names = [c.name for c in collections.collections]
+        logger.debug("Qdrant health check OK, collections: %s", names)
+        return True
+    except Exception as e:
+        logger.debug("Qdrant health check failed: %s", e)
+        return False
+
+
 def _serialize_patient(patient: Patient) -> str:
     """Convert Patient ORM object to JSON string for the agent."""
     data = {
@@ -88,11 +105,28 @@ def _serialize_patient(patient: Patient) -> str:
 
 
 async def generate_briefing(patient: Patient) -> BriefingResponse:
-    """Generate a patient briefing using the Claude agent."""
+    """Generate a patient briefing. Uses RAG agent if Qdrant is available, otherwise V1."""
+    logger.info(
+        "=== Briefing request: patient=%s conditions=%s ===",
+        patient.name,
+        patient.conditions,
+    )
+    if _qdrant_available():
+        logger.info("Routing -> RAG agent (multi-turn, max_turns=4)")
+        from src.agents.briefing_agent import generate_briefing as rag_generate
+
+        return await rag_generate(patient)
+
+    logger.info("Routing -> V1 agent (single-turn, no tools)")
+    return await _generate_briefing_v1(patient)
+
+
+async def _generate_briefing_v1(patient: Patient) -> BriefingResponse:
+    """V1 fallback: single-turn agent without tools."""
     patient_json = _serialize_patient(patient)
 
     options = ClaudeAgentOptions(
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=V1_SYSTEM_PROMPT,
         model=settings.ai_model,
         output_format={
             "type": "json_schema",
@@ -102,16 +136,34 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
         permission_mode="bypassPermissions",
     )
 
-    logger.info("Calling Claude agent for briefing generation")
+    logger.info(
+        "V1 agent: model=%s max_turns=2 patient=%s",
+        settings.ai_model,
+        patient.name,
+    )
     result = None
     try:
         async for message in query(prompt=patient_json, options=options):
-            if isinstance(message, ResultMessage):
+            if isinstance(message, AssistantMessage):
+                logger.info("V1 AssistantMessage received (model=%s)", message.model)
+            elif isinstance(message, ResultMessage):
+                logger.info(
+                    "V1 ResultMessage: num_turns=%d duration=%dms cost=$%.4f is_error=%s",
+                    message.num_turns,
+                    message.duration_ms,
+                    message.total_cost_usd or 0,
+                    message.is_error,
+                )
                 if not message.is_error and message.structured_output is not None:
                     briefing = PatientBriefing.model_validate(message.structured_output)
                     result = BriefingResponse(
                         **briefing.model_dump(),
                         generated_at=datetime.datetime.now(datetime.UTC),
+                    )
+                    logger.info(
+                        "V1 briefing: %d flags, %d actions",
+                        len(result.flags),
+                        len(result.suggested_actions),
                     )
                 if message.is_error:
                     raise BriefingGenerationError(
@@ -142,7 +194,7 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
         )
 
     if result is not None:
-        logger.info("Briefing generated successfully")
+        logger.info("V1 briefing generated successfully")
         return result
 
     raise BriefingGenerationError(

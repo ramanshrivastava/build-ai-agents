@@ -45,7 +45,7 @@ A working prototype for an AI clinical assistant that helps doctors **before**, 
 
 ```
 Phase 1 (POC):   WEB APP (browser-based)
-                 • Doctor opens in browser alongside existing LGC (AxiSanté)
+                 • Doctor opens in browser 
                  • Works on any OS, no installation
                  • Fastest to build and iterate
 
@@ -54,9 +54,6 @@ Phase 2 (Later): ELECTRON wrapper
                  • Overlay/floating panel capability
                  • Better mic access, global shortcuts
 
-Phase 3 (Future): Native LGC integration
-                 • Plugin into AxiSanté or similar
-                 • Requires vendor partnership
 ```
 
 **Voice Recording:** Uses browser's MediaRecorder API - works cross-platform (Windows, Mac, Linux) without any OS-specific code.
@@ -378,6 +375,7 @@ def test_memory_pressure_during_audio_processing():
 > **For each feature:** Write tests FIRST → Watch them fail → Implement → Pass → Refactor
 
 ### Phase 1: Project Setup
+
 - [ ] Initialize FastAPI backend with project structure
 - [ ] Initialize React frontend with Vite + TypeScript
 - [ ] **Set up test infrastructure:**
@@ -391,6 +389,7 @@ def test_memory_pressure_during_audio_processing():
 ### Phase 2: Before Consultation
 
 **Tests First:**
+
 - [ ] `test_patients_api.py` - CRUD endpoint tests
 - [ ] `test_patient_summary.py` - Summary generation tests
   - Test: generates summary from patient record
@@ -401,6 +400,7 @@ def test_memory_pressure_during_audio_processing():
 - [ ] `PatientSummary.test.tsx` - Component displays AI summary
 
 **Implementation:**
+
 - [ ] **Backend:** Patient CRUD endpoints (`/api/patients`)
 - [ ] **Backend:** Patient summary generation service
 - [ ] **Frontend:** Patient list view
@@ -409,6 +409,7 @@ def test_memory_pressure_during_audio_processing():
 ### Phase 3: During Consultation
 
 **Tests First:**
+
 - [ ] `AudioRecorder.test.tsx` - Audio recorder tests
   - Test: starts recording when button clicked
   - Test: displays timer during recording
@@ -420,6 +421,7 @@ def test_memory_pressure_during_audio_processing():
   - Test: rejects invalid file formats
 
 **Implementation:**
+
 - [ ] **Frontend:** Audio recorder component (MediaRecorder API)
 - [ ] **Backend:** Audio upload endpoint (`/api/consultations`)
 - [ ] **Backend:** Store consultation with patient reference
@@ -427,6 +429,7 @@ def test_memory_pressure_during_audio_processing():
 ### Phase 4: After Consultation
 
 **Tests First:**
+
 - [ ] `test_transcription.py` - Transcription service tests
   - Test: transcribes audio file successfully
   - Test: handles API errors gracefully
@@ -443,6 +446,7 @@ def test_memory_pressure_during_audio_processing():
   - Test: saves approved consultation
 
 **Implementation:**
+
 - [ ] **Backend:** Transcription service (Deepgram/AssemblyAI)
 - [ ] **Backend:** Consultation processor service
 - [ ] **Frontend:** Consultation review page
@@ -450,6 +454,7 @@ def test_memory_pressure_during_audio_processing():
 ### Phase 5: LLM Abstraction Layer
 
 **Tests First:**
+
 - [ ] `test_llm_provider.py` - Provider interface tests
   - Test: ClaudeProvider makes correct API call
   - Test: OpenAIProvider makes correct API call
@@ -457,6 +462,7 @@ def test_memory_pressure_during_audio_processing():
   - Test: config selects correct provider
 
 **Implementation:**
+
 - [ ] Create `LLMProvider` abstract base class
 - [ ] Implement `ClaudeProvider`
 - [ ] Implement `OpenAIProvider`
@@ -467,6 +473,7 @@ def test_memory_pressure_during_audio_processing():
 ## Data Models
 
 ### Patient
+
 ```python
 class Patient(BaseModel):
     id: str
@@ -479,6 +486,7 @@ class Patient(BaseModel):
 ```
 
 ### ConsultationResult
+
 ```python
 class ConsultationResult(BaseModel):
     transcript: str
@@ -528,6 +536,7 @@ DATABASE_URL=sqlite:///./data/app.db
 ### Backend Core Services
 
 **`backend/app/services/llm_provider.py`**
+
 ```python
 from abc import ABC, abstractmethod
 
@@ -549,6 +558,7 @@ class OpenAIProvider(LLMProvider):
 ```
 
 **`backend/app/services/patient_summary.py`**
+
 ```python
 async def generate_patient_summary(patient: Patient, llm: LLMProvider) -> PatientSummary:
     """
@@ -559,6 +569,7 @@ async def generate_patient_summary(patient: Patient, llm: LLMProvider) -> Patien
 ```
 
 **`backend/app/services/consultation_processor.py`**
+
 ```python
 async def process_consultation(
     transcript: str,
@@ -575,11 +586,13 @@ async def process_consultation(
 ### Frontend Core Components
 
 **`frontend/src/components/AudioRecorder.tsx`**
+
 - MediaRecorder API integration
 - Visual feedback (recording state, timer, audio levels)
 - Upload to backend on stop
 
 **`frontend/src/pages/AfterConsultation.tsx`**
+
 - Display transcript with timestamps
 - Editable AI-generated sections
 - Save/approve actions
@@ -589,17 +602,21 @@ async def process_consultation(
 ## Verification Plan
 
 ### Manual Testing
+
 1. **Before phase:** Select patient → verify AI summary appears with conditions, flags
 2. **During phase:** Record 1-2 min audio → verify upload succeeds
 3. **After phase:** Trigger processing → verify transcript + AI analysis generated
 
 ### Automated Tests
+
 - Unit tests for LLM provider abstraction
 - Integration tests for transcription service
 - API endpoint tests with pytest
 
 ### Demo Scenario
+
 Use this test case:
+
 - **Patient:** "John Davis, 58, Hypertension, Type 2 Diabetes"
 - **Simulated consultation:** Chest pain discussion
 - **Expected output:** ICD-10 R07.9, ECG prescription, follow-up in 2 weeks
@@ -622,5 +639,4 @@ Use this test case:
 - [ ] Speaker diarization (distinguishing doctor vs patient voice)
 - [ ] Medical terminology accuracy in transcription
 - [ ] HIPAA/HDS compliance for production
-- [ ] Integration with real LGC systems (AxiSanté API)
 - [ ] Multi-language support (French/English)
