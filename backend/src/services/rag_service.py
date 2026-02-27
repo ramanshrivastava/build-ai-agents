@@ -79,9 +79,7 @@ _VERTEX_PREDICT_URL = (
 )
 
 
-def _vertex_embed_via_api_key(
-    texts: list[str], task_type: str
-) -> list[list[float]]:
+def _vertex_embed_via_api_key(texts: list[str], task_type: str) -> list[list[float]]:
     """Call Vertex AI embedding endpoint directly using GCP API key."""
     url = _VERTEX_PREDICT_URL.format(
         location=settings.gcp_location,
@@ -326,9 +324,7 @@ async def async_embed_text(text: str) -> list[float]:
         text[:100] + ("..." if len(text) > 100 else ""),
     )
     if settings.google_api_key:
-        vectors = await _async_vertex_embed_via_api_key(
-            [text], "RETRIEVAL_QUERY"
-        )
+        vectors = await _async_vertex_embed_via_api_key([text], "RETRIEVAL_QUERY")
         vector = vectors[0]
     else:
         client = get_genai_client()
