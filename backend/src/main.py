@@ -8,6 +8,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from rich.logging import RichHandler
 
 from src.config import settings
 from src.database import engine
@@ -15,9 +16,18 @@ from src.routers.briefings import router as briefings_router
 from src.routers.patients import router as patients_router
 
 logging.basicConfig(
-    level=logging.DEBUG if settings.debug else logging.INFO,
-    format="%(levelname)s:     %(name)s - %(message)s",
+    level=logging.INFO,
+    format="%(name)s - %(message)s",
+    datefmt="%H:%M:%S",
+    handlers=[RichHandler(rich_tracebacks=True, markup=False)],
+    force=True,
 )
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+# Our app loggers: show DEBUG when debug=True, keep third-party libs at INFO
+if settings.debug:
+    for name in ("src.agents", "src.services", "src.routers"):
+        logging.getLogger(name).setLevel(logging.DEBUG)
 
 
 @asynccontextmanager
