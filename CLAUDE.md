@@ -93,6 +93,8 @@ build-ai-agents/
 Read these before starting work:
 - `docs/SCOPE-V1.md` — Current iteration plan and task breakdown
 - `docs/ARCHITECTURE.md` — Full system architecture vision (includes V2+ features)
+- `docs/RAG-ARCH.md` — RAG system architecture, requirements, and implementation phases
+- `docs/server-arch/` — Async server architecture series (event loop, FastAPI, RAG patterns)
 
 ### Running Commands
 

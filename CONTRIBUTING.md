@@ -38,7 +38,7 @@ docker compose up -d  # Start PostgreSQL 16
 
 ## Branch Naming
 
-- Features: `feature/<name>`
+- Features: `feat/<name>`
 - Bug fixes: `fix/<name>`
 
 ## Pull Requests

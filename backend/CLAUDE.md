@@ -8,17 +8,22 @@ This is part of a monorepo. Before starting work, read:
 
 Start Claude Code from repo root to ensure visibility into all docs.
 
-## Project Structure (V1)
+## Project Structure
 
 ```
 src/
 ├── __init__.py
 ├── main.py              # FastAPI app, CORS, lifespan, routers
-├── config.py            # pydantic-settings config
+├── config.py            # pydantic-settings config (+ Qdrant, GCP settings)
 ├── database.py          # SQLAlchemy async setup
+├── agents/
+│   ├── __init__.py
+│   ├── briefing_agent.py    # RAG-augmented agent (MCP server, max_turns=4)
+│   └── tools.py             # @tool search_clinical_guidelines
 ├── models/
 │   ├── __init__.py
 │   ├── orm.py           # SQLAlchemy Patient model
+│   ├── rag.py           # DocumentChunk, RetrievalResult
 │   └── schemas.py       # Pydantic request/response/error models
 ├── routers/
 │   ├── __init__.py
@@ -26,11 +31,13 @@ src/
 │   └── briefings.py     # Briefing endpoint
 └── services/
     ├── __init__.py
-    ├── patient_service.py   # Patient CRUD
-    └── briefing_service.py  # Agent orchestration (no tools in V1)
+    ├── patient_service.py       # Patient CRUD
+    ├── briefing_service.py      # Routes to RAG agent or V1 fallback
+    ├── rag_service.py           # Embed + search Qdrant
+    └── document_processor.py    # Markdown parsing + chunking
 ```
 
-> **V1 Note:** No `agents/` directory. Briefing logic lives in `services/briefing_service.py` using `claude_agent_sdk.query()` with structured output. No tools, no hooks.
+> **RAG Architecture:** `briefing_service.py` checks Qdrant availability. If up, delegates to `agents/briefing_agent.py` (multi-turn, `max_turns=4`, with `search_clinical_guidelines` tool). If Qdrant is down, falls back to V1 single-turn agent (no tools, `max_turns=2`).
 
 ## Running the Server
 
