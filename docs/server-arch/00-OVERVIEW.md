@@ -61,6 +61,8 @@ You do **not** need:
 | **02-EVENT-LOOP-AND-COROUTINES.md** | Python's Event Loop and Coroutines | The mechanism: coroutines, `await`, event loop, `asyncio.gather()` |
 | **03-FASTAPI-ASYNC-ARCHITECTURE.md** | FastAPI's Async Architecture | The framework: uvicorn, ASGI, async endpoints, SQLAlchemy async |
 | **04-ASYNC-PATTERNS-FOR-RAG.md** | Async Patterns for RAG Pipelines | The application: async Qdrant, embeddings, agent loops, antipatterns |
+| **05-SDK-STREAMING-AND-MCP-INTERNALS.md** | SDK Streaming and MCP Internals | The deep dive: CLI subprocess, stdin/stdout protocol, MCP tool bridge, shutdown races |
+| **06-FULL-STACK-INTERNALS.md** | Full Stack Internals: HTTP to Electrons | The bottom: NIC, DMA, kernel TCP/IP, kqueue/epoll, sockets, httptools, all 8 layers |
 
 ---
 
@@ -86,8 +88,10 @@ You do **not** need:
 **Goal**: Understand what happens inside Python when you write `await`, from coroutines to the event loop to ASGI.
 
 ```
-00 → 01 → 02 → 03 → 04
-│    │    │    │    │
+00 → 01 → 02 → 03 → 04 → 05 → 06
+│    │    │    │    │    │    │
+│    │    │    │    │    │    └─ Full stack: NIC, DMA, kernel TCP, kqueue, sockets, electrons
+│    │    │    │    │    └─ SDK: CLI subprocess protocol, MCP bridge, shutdown races
 │    │    │    │    └─ RAG: Apply everything to the ingestion + retrieval pipeline
 │    │    │    └─ FastAPI: How uvicorn, ASGI, and async endpoints connect
 │    │    └─ Event loop: Coroutines, await mechanics, gather, create_task
@@ -95,7 +99,22 @@ You do **not** need:
 └─ This overview
 ```
 
-**Time estimate**: 5-7 hours. Read in order -- each document builds on the previous.
+**Time estimate**: 8-10 hours. Read in order -- each document builds on the previous.
+
+### Deep Dive Path (How Does It REALLY Work?)
+
+**Goal**: Understand the full stack from physical signals to Python coroutines — how the NIC, kernel TCP/IP, kqueue/epoll, sockets, and the event loop fit together.
+
+```
+00 → 06 → 02 → 03
+│    │    │    │
+│    │    │    └─ FastAPI: See how the ASGI bridge connects kernel I/O to your endpoints
+│    │    └─ Event loop: Understand how Python's loop wraps the kernel syscalls from Doc 06
+│    └─ Full stack: Electrons, NIC, DMA, kernel TCP, kqueue/epoll, sockets, httptools
+└─ This overview
+```
+
+**Time estimate**: 4-5 hours. Start from the bottom of the stack and build up. Doc 06 is self-contained but connects to 02/03 for the Python layer.
 
 ### "Fix My Slow Endpoint" Path
 
@@ -192,13 +211,15 @@ These ground abstract concepts in the actual application.
 - **02**: `await` mechanics, `gather()` vs `create_task()` vs `await`, event loop pseudocode
 - **03**: ASGI lifecycle, `async def` vs `def` dispatch, SQLAlchemy async session patterns
 - **04**: RAG I/O chain diagram, async Qdrant client setup, antipattern table
+- **05**: SDK subprocess protocol, string vs streaming prompts, MCP bridge, `BaseExceptionGroup` handling
+- **06**: 8-layer stack trace, NIC/DMA/interrupts, kernel TCP/IP, kqueue/epoll internals, file descriptors, uvloop vs asyncio, TCP flow/congestion control, accept queues, keep-alive
 
 ---
 
 ## What This Series Does NOT Cover
 
 - **Threading and multiprocessing in depth**: We compare threads to async for motivation but don't teach `threading` or `multiprocessing` modules. See Python docs for those.
-- **OS-level I/O multiplexing**: `epoll`, `kqueue`, `select` are mentioned conceptually but not explored. This series stays at the Python level.
+- **OS-level I/O multiplexing**: Docs 01-05 stay at the Python level. Doc 06 goes deeper into `kqueue`/`epoll`, kernel socket buffers, NIC hardware, and DMA -- read it for the full stack from electrons to endpoints.
 - **JavaScript async / Node.js**: Concepts transfer, but all code is Python. We don't compare event loop implementations across languages.
 - **Advanced asyncio internals**: Event loop policies, custom event loops, `asyncio.Protocol`, low-level transport/protocol APIs. We cover what application developers need, not asyncio library developers.
 - **Async testing patterns**: Testing is covered in the context of specific documents (e.g., profiling in Doc 04) but is not a standalone topic. See `docs/RAG-ARCH.md` Section 9 for the RAG testing strategy.
@@ -231,4 +252,4 @@ The async patterns in Python's `asyncio` module are stable and unlikely to chang
 
 ---
 
-**Next Steps**: Proceed to `01-SYNC-VS-ASYNC.md` to understand why synchronous servers struggle with I/O-heavy workloads, or jump to `03-FASTAPI-ASYNC-ARCHITECTURE.md` if you already understand async fundamentals and want to see how FastAPI uses them.
+**Next Steps**: Proceed to `01-SYNC-VS-ASYNC.md` to understand why synchronous servers struggle with I/O-heavy workloads, or jump to `03-FASTAPI-ASYNC-ARCHITECTURE.md` if you already understand async fundamentals and want to see how FastAPI uses them. If you've already built with the Claude Agent SDK and hit MCP tool issues, jump to `05-SDK-STREAMING-AND-MCP-INTERNALS.md`. If you want the full picture from electrons to endpoints, jump to `06-FULL-STACK-INTERNALS.md`.
