@@ -14,8 +14,8 @@ This repo is a structured learning path from transformer basics to autonomous co
 
 | Resource | What You'll Learn |
 |----------|-------------------|
-| [`docs/agent-arch/05-TRANSFORMER-ARCHITECTURE.md`](docs/agent-arch/05-TRANSFORMER-ARCHITECTURE.md) | Tokenization, attention, FFN, generation |
-| [`docs/agent-arch/06-TRAINING-AND-RUNNING-MODELS.md`](docs/agent-arch/06-TRAINING-AND-RUNNING-MODELS.md) | Pre-training, fine-tuning, RLHF, inference |
+| [`docs/agent-arch/02-TRANSFORMER-ARCHITECTURE.md`](docs/agent-arch/02-TRANSFORMER-ARCHITECTURE.md) | Tokenization, attention, FFN, generation |
+| [`docs/agent-arch/03-TRAINING-AND-RUNNING-MODELS.md`](docs/agent-arch/03-TRAINING-AND-RUNNING-MODELS.md) | Pre-training, fine-tuning, RLHF, inference |
 | [`docs/agent-arch/01-ANTHROPIC-API-FUNDAMENTALS.md`](docs/agent-arch/01-ANTHROPIC-API-FUNDAMENTALS.md) | Messages API, structured output, streaming |
 
 ### Module 2: RAG (Retrieval-Augmented Generation)
@@ -24,7 +24,9 @@ This repo is a structured learning path from transformer basics to autonomous co
 
 | Resource | What You'll Learn |
 |----------|-------------------|
-| `docs/agent-arch/07-RAG-FUNDAMENTALS.md` | *Coming soon* — embeddings, vector DBs, chunking, retrieval |
+| [`docs/agent-arch/04-VECTOR-DATABASES-AND-EMBEDDINGS.md`](docs/agent-arch/04-VECTOR-DATABASES-AND-EMBEDDINGS.md) | Embeddings, similarity metrics, HNSW, Qdrant |
+| [`docs/agent-arch/05-RAG-ARCHITECTURE-AND-PIPELINE.md`](docs/agent-arch/05-RAG-ARCHITECTURE-AND-PIPELINE.md) | Ingest/retrieve phases, chunking, agent-tool RAG |
+| [`docs/agent-arch/06-RAG-EVALUATION-AND-PRODUCTION.md`](docs/agent-arch/06-RAG-EVALUATION-AND-PRODUCTION.md) | Retrieval metrics, testing, failure modes, production |
 
 ### Module 3: Agentic Workflows
 
@@ -32,9 +34,9 @@ This repo is a structured learning path from transformer basics to autonomous co
 
 | Resource | What You'll Learn |
 |----------|-------------------|
-| [`docs/agent-arch/02-TOOL-USE-AND-AGENTIC-LOOP.md`](docs/agent-arch/02-TOOL-USE-AND-AGENTIC-LOOP.md) | Tool calling, agentic loops, orchestration |
-| [`docs/agent-arch/03-PROMPT-CACHING-AND-OPTIMIZATION.md`](docs/agent-arch/03-PROMPT-CACHING-AND-OPTIMIZATION.md) | Caching, batching, cost optimization |
-| [`docs/agent-arch/04-MCP-AND-A2A-PROTOCOLS.md`](docs/agent-arch/04-MCP-AND-A2A-PROTOCOLS.md) | MCP servers/clients, A2A protocol |
+| [`docs/agent-arch/07-TOOL-USE-AND-AGENTIC-LOOP.md`](docs/agent-arch/07-TOOL-USE-AND-AGENTIC-LOOP.md) | Tool calling, agentic loops, orchestration |
+| [`docs/agent-arch/08-PROMPT-CACHING-AND-OPTIMIZATION.md`](docs/agent-arch/08-PROMPT-CACHING-AND-OPTIMIZATION.md) | Caching, batching, cost optimization |
+| [`docs/agent-arch/09-MCP-AND-A2A-PROTOCOLS.md`](docs/agent-arch/09-MCP-AND-A2A-PROTOCOLS.md) | MCP servers/clients, A2A protocol |
 | [`backend/src/services/briefing_service.py`](backend/src/services/briefing_service.py) | **Live code** — real agent with structured output |
 | [`docs/SCOPE-V1.md`](docs/SCOPE-V1.md) | How the agentic workflow was planned and built |
 
@@ -158,7 +160,7 @@ build-ai-agents/
 │   ├── src/
 │   └── package.json
 ├── docs/
-│   ├── agent-arch/           # 7 docs: API → transformers → agents
+│   ├── agent-arch/           # 11 docs: foundations → RAG → agents
 │   ├── infra-arch/           # 13 docs: K8s → GKE → deployment
 │   ├── SCOPE-V1.md           # V1 planning document
 │   ├── SCOPE-V2.md           # V2 planning document

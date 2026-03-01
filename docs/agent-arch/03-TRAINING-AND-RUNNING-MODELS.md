@@ -1,6 +1,6 @@
 # Training & Running Models
 
-**Part 7 of 8: Agent Architecture & AI Model Internals Series**
+**Part 3 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -1229,21 +1229,17 @@ refined, it's tested against Claude's API to verify quality.
 
 ---
 
-## Series Complete — Where to Go From Here
+## Module 1 Complete — Where to Go From Here
 
-You have reached the end of the **Agent Architecture & AI Model Internals Series**. Seven documents, covering the full stack from API calls to training pipelines.
+You have finished **Module 1: Foundations** of the Agent Architecture & AI Model Internals Series — three documents covering API fundamentals, transformer architecture, and the training pipeline.
 
-### What We Covered
+### What We Covered (Module 1)
 
 | Document | Title | Key Concepts |
 |----------|-------|-------------|
-| [00-OVERVIEW.md](./00-OVERVIEW.md) | Series Overview | Prerequisites, reading paths, conventions |
 | [01-ANTHROPIC-API-FUNDAMENTALS.md](./01-ANTHROPIC-API-FUNDAMENTALS.md) | Anthropic API Fundamentals | Messages API, authentication, models, parameters, token counting, streaming |
-| [02-TOOL-USE-AND-AGENTIC-LOOP.md](./02-TOOL-USE-AND-AGENTIC-LOOP.md) | Tool Use & The Agentic Loop | Tool definitions, JSON Schema, the two-step dance, multi-tool orchestration, agent frameworks |
-| [03-PROMPT-CACHING-AND-OPTIMIZATION.md](./03-PROMPT-CACHING-AND-OPTIMIZATION.md) | Prompt Caching & Optimization | KV cache internals, Anthropic cache API, cost reduction strategies, latency optimization |
-| [04-MCP-AND-A2A-PROTOCOLS.md](./04-MCP-AND-A2A-PROTOCOLS.md) | MCP & A2A Protocols | Model Context Protocol, Agent2Agent protocol, tool vs. agent communication standards |
-| [05-TRANSFORMER-ARCHITECTURE.md](./05-TRANSFORMER-ARCHITECTURE.md) | Transformer Architecture | Tokenization, embeddings, positional encoding, self-attention, FFN layers, generation |
-| **06-TRAINING-AND-RUNNING-MODELS.md** | **Training & Running Models** | **Pre-training, SFT, RLHF, Constitutional AI, tool training, Ollama, quantization, local inference** |
+| [02-TRANSFORMER-ARCHITECTURE.md](./02-TRANSFORMER-ARCHITECTURE.md) | Transformer Architecture | Tokenization, embeddings, positional encoding, self-attention, FFN layers, generation |
+| **03-TRAINING-AND-RUNNING-MODELS.md** | **Training & Running Models** | **Pre-training, SFT, RLHF, Constitutional AI, tool training, Ollama, quantization, local inference** |
 
 ### The Journey, End to End
 
@@ -1253,33 +1249,33 @@ The series traces a complete path through modern AI systems:
 ┌─────────────────────────────────────────────────────────────────┐
 │                   THE COMPLETE PICTURE                           │
 │                                                                  │
-│  HOW MODELS ARE BUILT (Docs 05, 06)                             │
+│  MODULE 1: FOUNDATIONS (Docs 01-03)                             │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌─────────────┐  │
-│  │ Data     │──>│ Pre-     │──>│Alignment │──>│ Deployed    │  │
-│  │ (trillions│  │ Training │   │ (SFT +   │   │ Model       │  │
-│  │ of tokens)│  │ (Doc 06) │   │  RLHF)   │   │ (API)       │  │
+│  │ API Call │   │ Tokens & │   │ Pre-     │──>│ Deployed    │  │
+│  │ (Doc 01) │   │ Attention│   │ Training │   │ Model       │  │
+│  │          │   │ (Doc 02) │   │ (Doc 03) │   │ (API)       │  │
 │  └──────────┘   └──────────┘   └──────────┘   └──────┬──────┘  │
 │                                                       │         │
-│  HOW MODELS WORK INTERNALLY (Doc 05)                  │         │
+│  MODULE 2: RAG (Docs 04-06)                           │         │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐          │         │
-│  │ Tokens   │──>│ Attention│──>│ Generate  │          │         │
-│  │ & Embed  │   │ Layers   │   │ Output    │          │         │
+│  │ Vectors &│──>│ RAG      │──>│ Eval &   │          │         │
+│  │ Embed    │   │ Pipeline │   │ Prod     │          │         │
+│  │ (Doc 04) │   │ (Doc 05) │   │ (Doc 06) │          │         │
 │  └──────────┘   └──────────┘   └──────────┘          │         │
 │                                                       │         │
-│  HOW WE USE MODELS (Docs 01-04)                       │         │
+│  MODULE 3: BUILDING AGENTS (Docs 07-10)               │         │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐          │         │
-│  │ API Call │──>│ Tool Use │──>│ Caching & │<─────────┘         │
-│  │ (Doc 01) │   │ (Doc 02) │   │ Optimize  │                    │
-│  └──────────┘   └──────────┘   │ (Doc 03)  │                    │
-│                                 └────┬─────┘                    │
+│  │ Tool Use │──>│ Caching &│──>│ MCP/A2A  │<─────────┘         │
+│  │ (Doc 07) │   │ Optimize │   │ Protocols│                    │
+│  └──────────┘   │ (Doc 08) │   │ (Doc 09) │                    │
+│                  └──────────┘   └──────────┘                    │
 │                                      │                          │
-│  HOW MODELS CONNECT (Doc 04)         │                          │
-│  ┌──────────┐   ┌──────────┐         │                          │
-│  │ MCP      │──>│ A2A      │<────────┘                          │
-│  │ Protocol │   │ Protocol │                                    │
-│  └──────────┘   └──────────┘                                    │
+│  ┌──────────┐                        │                          │
+│  │ Agent SDK│<───────────────────────┘                          │
+│  │ (Doc 10) │                                                   │
+│  └──────────┘                                                   │
 │                                                                  │
-│  HOW WE RUN MODELS OURSELVES (Doc 06)                           │
+│  HOW WE RUN MODELS OURSELVES (Doc 03)                           │
 │  ┌──────────┐   ┌──────────┐   ┌──────────┐                    │
 │  │ Ollama   │──>│Quantize  │──>│ Serve    │                    │
 │  │ (local)  │   │ (GGUF)   │   │ (vLLM)   │                    │
@@ -1295,7 +1291,7 @@ The series traces a complete path through modern AI systems:
 # Make your first API call (Document 01)
 ./scripts/test-tool-call.sh
 
-# See the full tool-use round trip (Document 02)
+# See the full tool-use round trip (Document 07)
 ./scripts/test-tool-call-opus-step2.sh
 ```
 
@@ -1335,6 +1331,9 @@ Together, the two series cover the complete stack: from how models are trained (
 
 ---
 
-*This is the final document in the Agent Architecture & AI Model Internals Series.*
+**Next Steps**: Proceed to [04-VECTOR-DATABASES-AND-EMBEDDINGS.md](./04-VECTOR-DATABASES-AND-EMBEDDINGS.md) to begin Module 2: RAG — learning how text is converted to vectors, stored in vector databases, and retrieved for AI-augmented generation.
 
-*Series: [00-OVERVIEW](./00-OVERVIEW.md) | [01-API-FUNDAMENTALS](./01-ANTHROPIC-API-FUNDAMENTALS.md) | [02-TOOL-USE](./02-TOOL-USE-AND-AGENTIC-LOOP.md) | [03-CACHING](./03-PROMPT-CACHING-AND-OPTIMIZATION.md) | [04-MCP-A2A](./04-MCP-AND-A2A-PROTOCOLS.md) | [05-TRANSFORMERS](./05-TRANSFORMER-ARCHITECTURE.md) | **06-TRAINING** (you are here)*
+---
+
+*Part 3 of 11: Agent Architecture & AI Model Internals Series*
+*AI Doctor Assistant Project*

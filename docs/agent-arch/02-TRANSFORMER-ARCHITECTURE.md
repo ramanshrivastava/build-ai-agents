@@ -1,6 +1,6 @@
 # Transformer Architecture — How the Model Actually Works
 
-**Part 6 of 8: Agent Architecture & AI Model Internals Series**
+**Part 2 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -45,7 +45,7 @@ After reading this document, you will be able to:
 - Diagram a complete transformer block (norm → attention → residual → norm → FFN → residual)
 - Explain how the model generates one token at a time using softmax over the vocabulary
 - Compare sampling strategies (greedy, temperature, top-k, top-p) and their tradeoffs
-- Describe how KV cache connects attention to efficient generation (linking back to Doc 03)
+- Describe how KV cache connects attention to efficient generation (linking back to Doc 08)
 - Estimate model memory requirements from parameter count and precision
 - Explain tensor parallelism, pipeline parallelism, and Mixture of Experts at a high level
 
@@ -920,9 +920,9 @@ This is why MoE models are "large but fast" — Mixtral 8×7B has 47B total para
 
 ## Next Steps
 
-> **Next:** Proceed to [06-TRAINING-AND-RUNNING-MODELS.md](./06-TRAINING-AND-RUNNING-MODELS.md) to learn how these massive models are trained (pre-training on trillions of tokens, RLHF alignment, Constitutional AI), and how to run models locally with Ollama and llama.cpp — including quantization techniques that fit 70B-parameter models onto consumer GPUs.
+> **Next:** Proceed to [03-TRAINING-AND-RUNNING-MODELS.md](./03-TRAINING-AND-RUNNING-MODELS.md) to learn how these massive models are trained (pre-training on trillions of tokens, RLHF alignment, Constitutional AI), and how to run models locally with Ollama and llama.cpp — including quantization techniques that fit 70B-parameter models onto consumer GPUs.
 
 ---
 
-*Part 6 of 8: Agent Architecture & AI Model Internals Series*
+*Part 2 of 11: Agent Architecture & AI Model Internals Series*
 *AI Doctor Assistant Project*
