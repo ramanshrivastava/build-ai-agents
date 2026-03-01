@@ -1,6 +1,6 @@
 # Prompt Caching and Optimization
 
-**Part 4 of 8: Agent Architecture & AI Model Internals Series**
+**Part 8 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -872,9 +872,9 @@ flowchart TD
 
 This document covered the mechanics of KV caching (what the GPU does during inference), prompt caching (what the API provider does across requests), and practical optimization strategies for cost and latency.
 
-The next document in the series, **[04-MCP-AND-A2A-PROTOCOLS.md](./04-MCP-AND-A2A-PROTOCOLS.md)**, covers the standardized protocols that allow AI agents to connect to external tools (MCP) and communicate with other agents (A2A). These protocols define how agents break out of the text-in-text-out paradigm and interact with the real world.
+The next document in the series, **[09-MCP-AND-A2A-PROTOCOLS.md](./09-MCP-AND-A2A-PROTOCOLS.md)**, covers the standardized protocols that allow AI agents to connect to external tools (MCP) and communicate with other agents (A2A). These protocols define how agents break out of the text-in-text-out paradigm and interact with the real world.
 
 ---
 
-*Part 4 of 8: Agent Architecture & AI Model Internals Series*
+*Part 8 of 11: Agent Architecture & AI Model Internals Series*
 *AI Doctor Assistant Project*

@@ -1,6 +1,6 @@
 # Anthropic API Fundamentals
 
-**Part 1 of 8: Agent Architecture & AI Model Internals Series**
+**Part 1 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -355,7 +355,7 @@ Array content with multiple blocks:
 ]}
 ```
 
-Tool use content blocks are covered in depth in `02-TOOL-USE-AND-AGENTIC-LOOP.md`.
+Tool use content blocks are covered in depth in `07-TOOL-USE-AND-AGENTIC-LOOP.md`.
 
 ### Why You Resend Everything
 
@@ -398,7 +398,7 @@ TURN 3: Another follow-up (you resend everything again)
                                                     5 messages sent
 ```
 
-Notice: the messages array **grows with every turn**. By turn 10, you are sending 19 messages (10 user + 9 assistant). This has cost implications -- you are paying for input tokens on every previous message *again*. This is why **prompt caching** (covered in `03-PROMPT-CACHING-AND-OPTIMIZATION.md`) is critical for multi-turn conversations.
+Notice: the messages array **grows with every turn**. By turn 10, you are sending 19 messages (10 user + 9 assistant). This has cost implications -- you are paying for input tokens on every previous message *again*. This is why **prompt caching** (covered in `08-PROMPT-CACHING-AND-OPTIMIZATION.md`) is critical for multi-turn conversations.
 
 ### Conversation Flow Diagram
 
@@ -541,7 +541,7 @@ The `usage` object tracks token consumption:
 | `cache_creation_input_tokens` | Tokens written to the prompt cache on this request. Billed at 1.25x input price. |
 | `cache_read_input_tokens` | Tokens read from the prompt cache instead of reprocessing. Billed at 0.1x input price (90% savings). |
 
-Caching fields are covered in depth in `03-PROMPT-CACHING-AND-OPTIMIZATION.md`.
+Caching fields are covered in depth in `08-PROMPT-CACHING-AND-OPTIMIZATION.md`.
 
 ```
 AI DOCTOR EXAMPLE:
@@ -745,7 +745,7 @@ At temperature 0.5: Usually "hypertension", sometimes "high"
 At temperature 1.0: Picks proportional to original probabilities
 ```
 
-The mathematical details of temperature scaling are covered in `05-TRANSFORMER-ARCHITECTURE.md`.
+The mathematical details of temperature scaling are covered in `02-TRANSFORMER-ARCHITECTURE.md`.
 
 ### top_p (Nucleus Sampling)
 
@@ -1113,8 +1113,8 @@ Sonnet example:
 At 1,000 requests/day × 30 days = $540/month
 ```
 
-The biggest cost lever is **input tokens** in multi-turn conversations (resending history) and **prompt caching** (90% input cost reduction). Both are covered in `03-PROMPT-CACHING-AND-OPTIMIZATION.md`.
+The biggest cost lever is **input tokens** in multi-turn conversations (resending history) and **prompt caching** (90% input cost reduction). Both are covered in `08-PROMPT-CACHING-AND-OPTIMIZATION.md`.
 
 ---
 
-**Next Steps**: Proceed to `02-TOOL-USE-AND-AGENTIC-LOOP.md` to learn how Claude can call functions, execute code, and interact with external systems through the tool use API. This is where the API transforms from "question in, answer out" to "agent that can take actions."
+**Next Steps**: Proceed to `02-TRANSFORMER-ARCHITECTURE.md` to learn how transformers convert text into numbers and generate output, or jump to `07-TOOL-USE-AND-AGENTIC-LOOP.md` to learn how Claude can call functions and interact with external systems through the tool use API.

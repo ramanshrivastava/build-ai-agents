@@ -1,6 +1,6 @@
 # Tool Use and the Agentic Loop
 
-**Part 3 of 8: Agent Architecture & AI Model Internals Series**
+**Part 7 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -1961,4 +1961,4 @@ Tool use is the mechanism that transforms a language model from a text generator
 
 ## Next Steps
 
-> **Next:** Proceed to [03-PROMPT-CACHING-AND-OPTIMIZATION.md](./03-PROMPT-CACHING-AND-OPTIMIZATION.md) to learn how prompt caching reduces the token cost of the growing messages array in agentic loops, how to structure your prompts for cache hits, and how to measure and optimize the cost of multi-turn tool use conversations. The growing messages array we discussed in Section 4 becomes expensive fast -- caching is the primary mitigation.
+> **Next:** Proceed to [08-PROMPT-CACHING-AND-OPTIMIZATION.md](./08-PROMPT-CACHING-AND-OPTIMIZATION.md) to learn how prompt caching reduces the token cost of the growing messages array in agentic loops, how to structure your prompts for cache hits, and how to measure and optimize the cost of multi-turn tool use conversations. The growing messages array we discussed in Section 4 becomes expensive fast -- caching is the primary mitigation.

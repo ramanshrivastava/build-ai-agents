@@ -1,6 +1,6 @@
 # Claude Agent SDK
 
-**Part 8 of 8: Agent Architecture & AI Model Internals Series**
+**Part 10 of 11: Agent Architecture & AI Model Internals Series**
 **AI Doctor Assistant Project**
 
 ---
@@ -43,7 +43,7 @@ Key mental models to internalize:
 
 What this document is NOT:
 
-- A framework comparison. Doc 02 covers that in the ["When to Use What" decision tree](02-TOOL-USE-AND-AGENTIC-LOOP.md#when-to-use-what) and the [comparison table](02-TOOL-USE-AND-AGENTIC-LOOP.md#comparison-table). This document goes deep on the SDK itself.
+- A framework comparison. Doc 07 covers that in the ["When to Use What" decision tree](07-TOOL-USE-AND-AGENTIC-LOOP.md#when-to-use-what) and the [comparison table](07-TOOL-USE-AND-AGENTIC-LOOP.md#comparison-table). This document goes deep on the SDK itself.
 - A tutorial for the raw Anthropic API. Doc 01 covers [authentication](01-ANTHROPIC-API-FUNDAMENTALS.md#2-authentication), [messages](01-ANTHROPIC-API-FUNDAMENTALS.md#4-the-messages-array), and [parameters](01-ANTHROPIC-API-FUNDAMENTALS.md#7-configuration-parameters).
 
 ---
@@ -54,7 +54,7 @@ The Claude Agent SDK is a Python (and TypeScript) library that sits between your
 
 ### Where It Sits
 
-Doc 02 introduced three levels of abstraction for building with LLMs:
+Doc 07 introduced three levels of abstraction for building with LLMs:
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -82,11 +82,11 @@ Doc 02 introduced three levels of abstraction for building with LLMs:
 | Error propagation from CLI subprocess | How to handle each error type |
 | Async iteration over message stream | Business logic for each message type |
 
-### What This Document Covers vs Doc 02
+### What This Document Covers vs Doc 07
 
-Doc 02's coverage (~180 lines) answers **"why the SDK instead of alternatives?"** — positioning it in the framework landscape with a comparison table and decision tree.
+Doc 07's coverage (~180 lines) answers **"why the SDK instead of alternatives?"** — positioning it in the framework landscape with a comparison table and decision tree.
 
-This document answers **"how does the SDK actually work?"** — architecture, `query()` internals, structured output flow, error handling, tools, testing, permissions, and hooks. If Doc 02 is the menu, this document is the recipe.
+This document answers **"how does the SDK actually work?"** — architecture, `query()` internals, structured output flow, error handling, tools, testing, permissions, and hooks. If Doc 07 is the menu, this document is the recipe.
 
 ---
 
@@ -616,12 +616,12 @@ async def fetch_patient(args: dict) -> dict:
 
 The decorator registers three things:
 1. **Name** (`"fetch_patient"`) — how the model refers to the tool
-2. **Description** — helps the model decide when to use it (see Doc 02's [tool definitions](02-TOOL-USE-AND-AGENTIC-LOOP.md))
+2. **Description** — helps the model decide when to use it (see Doc 07's [tool definitions](07-TOOL-USE-AND-AGENTIC-LOOP.md))
 3. **Parameters schema** — JSON Schema for the tool's input
 
 ### MCP Server Registration
 
-Tools are grouped into MCP servers (see Doc 04's [MCP protocol coverage](04-MCP-AND-A2A-PROTOCOLS.md)):
+Tools are grouped into MCP servers (see Doc 09's [MCP protocol coverage](09-MCP-AND-A2A-PROTOCOLS.md)):
 
 ```python
 from claude_agent_sdk import create_sdk_mcp_server
@@ -647,7 +647,7 @@ options = ClaudeAgentOptions(
 )
 ```
 
-This naming convention connects to the MCP protocol from Doc 04 — each tool is namespaced by its server.
+This naming convention connects to the MCP protocol from Doc 09 — each tool is namespaced by its server.
 
 ### Why V1 Has No Tools
 
@@ -932,9 +932,9 @@ The Claude Agent SDK occupies a sweet spot for single-provider applications like
 - **Less than a framework**: No multi-provider abstraction, no chain system, no memory backends. Fewer moving parts = easier debugging.
 - **Close to the metal**: The SDK's concepts (messages, tools, schemas) map directly to API concepts. Understanding the SDK means understanding the API.
 
-### What Doc 02 Covered vs What This Doc Covered
+### What Doc 07 Covered vs What This Doc Covered
 
-| Topic | Doc 02 | Doc 07 (this doc) |
+| Topic | Doc 07 | Doc 10 (this doc) |
 |-------|--------|-------------------|
 | Framework comparison (SDK vs LangChain vs raw API) | Detailed table + decision tree | Reference only |
 | SDK architecture (subprocess model, message flow) | Not covered | Full treatment |
@@ -961,5 +961,5 @@ After reading this document, you should be able to explain:
 
 ---
 
-**Previous**: [06 — Training & Running Models](06-TRAINING-AND-RUNNING-MODELS.md)
+**Previous**: [09 — MCP & A2A Protocols](09-MCP-AND-A2A-PROTOCOLS.md)
 **Series Overview**: [00 — Overview](00-OVERVIEW.md)
