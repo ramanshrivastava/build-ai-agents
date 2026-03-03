@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     qdrant_api_key: str = ""
 
     # Google AI Embeddings
-    # Set GOOGLE_API_KEY for API key auth, otherwise uses Vertex AI ADC.
+    # Google API key for Vertex AI embeddings (required for RAG).
     google_api_key: str = ""
     gcp_project_id: str = "raman-gcp-project-k8s-dev"
     gcp_location: str = "us-central1"
