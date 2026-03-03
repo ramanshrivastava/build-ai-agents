@@ -139,7 +139,7 @@ def embed_text(text: str) -> list[float]:
             ),
         )
         vector = list(response.embeddings[0].values)
-    logger.debug("Embedded query -> %d-dim vector", len(vector))
+    logger.debug("Embedded query -> %d-dim vector %s", len(vector), vector[:4])
     return vector
 
 
@@ -337,7 +337,7 @@ async def async_embed_text(text: str) -> list[float]:
             ),
         )
         vector = list(response.embeddings[0].values)
-    logger.debug("Async embedded query -> %d-dim vector", len(vector))
+    logger.debug("Async embedded query -> %d-dim vector %s", len(vector), vector[:4])
     return vector
 
 
