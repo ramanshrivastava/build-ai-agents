@@ -17,7 +17,6 @@
    - [From Transformer Internals to Embedding APIs](#from-transformer-internals-to-embedding-apis)
    - [Task Types: RETRIEVAL_QUERY vs RETRIEVAL_DOCUMENT](#task-types-retrieval_query-vs-retrieval_document)
    - [Our Embedding Code](#our-embedding-code)
-   - [The Two-Path Architecture](#the-two-path-architecture)
 4. [Embedding Model Selection](#3-embedding-model-selection)
    - [MTEB Benchmarks](#mteb-benchmarks)
    - [Dimension Tradeoffs](#dimension-tradeoffs)
@@ -384,36 +383,6 @@ Notice the key differences:
 1. **Task type**: `RETRIEVAL_QUERY` for queries, `RETRIEVAL_DOCUMENT` for documents
 2. **Batch vs single**: `embed_text` handles one string, `embed_batch` handles a list
 3. **When called**: `embed_text` is called at search time (latency-sensitive), `embed_batch` is called at ingestion time (throughput-sensitive)
-
----
-
-### The Two-Path Architecture
-
-The project supports two authentication paths for the embedding API. This is a practical detail worth understanding:
-
-```
-TWO AUTHENTICATION PATHS:
-
-  Path 1: API Key (settings.google_api_key is set)
-  ┌──────────┐    HTTPS + API key    ┌────────────────────┐
-  │  Backend  │ ───────────────────→  │  Vertex AI REST    │
-  │           │                       │  /v1/.../predict    │
-  └──────────┘                       └────────────────────┘
-  - Direct HTTP call via httpx
-  - Simple authentication
-  - Works from any environment
-
-  Path 2: Application Default Credentials (no API key)
-  ┌──────────┐    Google GenAI SDK    ┌────────────────────┐
-  │  Backend  │ ───────────────────→  │  Vertex AI         │
-  │           │   (ADC / OAuth2)      │  via google.genai   │
-  └──────────┘                       └────────────────────┘
-  - Uses google.genai SDK
-  - ADC (gcloud auth / service account)
-  - More secure for production
-```
-
-Both paths produce identical embedding vectors. The choice is purely about authentication convenience.
 
 ---
 

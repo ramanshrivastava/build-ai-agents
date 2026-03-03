@@ -793,36 +793,7 @@ Each result is wrapped in a `RetrievalResult` that pairs the `DocumentChunk` wit
 
 ### The Async Variant
 
-The search function also has an async variant (`async_search`) for use inside the agent tool handler. The tool handler runs inside the Claude Agent SDK's agentic loop, which is async. Using a sync Qdrant client inside an async handler would block the event loop.
-
-```python
-# From backend/src/services/rag_service.py
-
-async def async_search(
-    query: str,
-    specialty: str | None = None,
-    limit: int = 5,
-) -> list[RetrievalResult]:
-    """Embed query and search Qdrant asynchronously (non-blocking)."""
-    query_vector = await async_embed_text(query)
-
-    client = get_async_qdrant_client()
-    results = await client.query_points(
-        collection_name=settings.qdrant_collection,
-        query=query_vector,
-        query_filter=query_filter,
-        score_threshold=0.5,
-        limit=limit,
-        with_payload=True,
-    )
-```
-
-The logic is identical to the sync version. The only differences are:
-- `await async_embed_text(query)` instead of `embed_text(query)`
-- `get_async_qdrant_client()` returns `AsyncQdrantClient` instead of `QdrantClient`
-- `await client.query_points(...)` instead of `client.query_points(...)`
-
-This is a common pattern in async Python: every I/O call that could block must be awaited. The sync version is used during ingestion (a batch script). The async version is used during retrieval (inside the FastAPI request handler and agent tool loop).
+An async variant `async_search()` exists for use inside the agent tool handler (which runs in the Claude Agent SDK's async agentic loop). The logic is identical to the sync version above, with `await` on I/O calls (`async_embed_text`, `AsyncQdrantClient.query_points`). The sync version is used during ingestion; the async version during retrieval inside the FastAPI request handler.
 
 ```
 AI DOCTOR EXAMPLE:

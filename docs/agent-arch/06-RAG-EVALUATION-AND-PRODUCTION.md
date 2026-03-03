@@ -1484,39 +1484,6 @@ In production, retrieval quality can degrade silently. New documents change the 
 
 **The simplest monitoring:** Log every tool call with the query, number of results, and top score. A weekly script computes averages and flags anomalies.
 
-### Cost
-
-Embedding API calls and vector storage are not free. Understanding the cost model helps you budget and optimize.
-
-**Embedding costs (Vertex AI):**
-
-```
-text-embedding-005 pricing (approximate):
-  $0.0001 per 1,000 characters embedded
-
-Ingestion cost for 100 clinical guideline documents:
-  Average document: 5,000 words ≈ 25,000 characters
-  100 docs × 25,000 chars = 2,500,000 characters
-  Cost: 2,500 × $0.0001 = $0.25
-
-Query embedding cost:
-  Average query: 50 characters
-  1,000 queries/day × 50 chars = 50,000 characters
-  Daily cost: 50 × $0.0001 = $0.005
-```
-
-Embedding costs are negligible for the AI Doctor project's scale. The LLM (Claude) costs dominate.
-
-**Qdrant hosting costs:**
-
-| Option | Cost | Best for |
-|--------|------|----------|
-| Self-hosted Docker | Free (plus server costs) | Development, small deployments |
-| Qdrant Cloud (free tier) | $0 (1GB storage, 1M vectors) | Prototypes, small projects |
-| Qdrant Cloud (production) | ~$25-100/month | Production with SLA |
-
-For V1 of the AI Doctor project, the self-hosted Docker option (alongside PostgreSQL in docker-compose) is sufficient.
-
 ---
 
 ## 6. Hybrid Search and Advanced Techniques
