@@ -8,7 +8,8 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.models.orm import Patient
-from src.agents.briefing_agent import BriefingGenerationError, generate_briefing
+from src.agents.briefing_agent import generate_briefing
+from src.services.briefing_service import BriefingGenerationError
 
 # --- Fixtures ---
 

@@ -31,6 +31,7 @@ from src.agents.tools import search_clinical_guidelines
 from src.config import settings
 from src.models.orm import Patient
 from src.models.schemas import BriefingResponse, PatientBriefing
+from src.services.briefing_service import BriefingGenerationError, _serialize_patient
 
 logger = logging.getLogger(__name__)
 
@@ -104,30 +105,6 @@ CONSTRAINTS:
 based on the patient data and note that guidelines were unavailable.
 - Be concise. Physicians need quick, scannable information.
 """
-
-
-class BriefingGenerationError(Exception):
-    """Raised when briefing generation fails."""
-
-    def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        self.message = message
-        super().__init__(message)
-
-
-def _serialize_patient(patient: Patient) -> str:
-    """Convert Patient ORM object to JSON string for the agent."""
-    data = {
-        "name": patient.name,
-        "date_of_birth": patient.date_of_birth.isoformat(),
-        "gender": patient.gender,
-        "conditions": patient.conditions,
-        "medications": patient.medications,
-        "labs": patient.labs,
-        "allergies": patient.allergies,
-        "visits": patient.visits,
-    }
-    return json.dumps(data, indent=2)
 
 
 def _log_assistant_message(message: AssistantMessage, turn: int) -> None:

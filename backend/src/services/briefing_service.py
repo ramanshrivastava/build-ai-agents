@@ -74,13 +74,13 @@ class BriefingGenerationError(Exception):
         super().__init__(message)
 
 
-def _qdrant_available() -> bool:
+async def _qdrant_available() -> bool:
     """Check if Qdrant is reachable. Returns False on any error."""
     try:
-        from src.services.rag_service import get_qdrant_client
+        from src.services.rag_service import get_async_qdrant_client
 
-        client = get_qdrant_client()
-        collections = client.get_collections()
+        client = get_async_qdrant_client()
+        collections = await client.get_collections()
         names = [c.name for c in collections.collections]
         logger.debug("Qdrant health check OK, collections: %s", names)
         return True
@@ -111,7 +111,7 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
         patient.name,
         patient.conditions,
     )
-    if _qdrant_available():
+    if await _qdrant_available():
         logger.info("Routing -> RAG agent (multi-turn, max_turns=4)")
         from src.agents.briefing_agent import generate_briefing as rag_generate
 
