@@ -43,18 +43,6 @@ def _fake_embedding(dim: int = 768) -> list[float]:
     return [0.1] * dim
 
 
-def _mock_embed_response(num_texts: int = 1, dim: int = 768) -> MagicMock:
-    """Create a mock response matching google.genai embed_content response."""
-    mock_resp = MagicMock()
-    embeddings = []
-    for _ in range(num_texts):
-        emb = MagicMock()
-        emb.values = _fake_embedding(dim)
-        embeddings.append(emb)
-    mock_resp.embeddings = embeddings
-    return mock_resp
-
-
 @pytest.fixture
 def in_memory_qdrant(monkeypatch: pytest.MonkeyPatch) -> QdrantClient:
     """Use in-memory Qdrant for tests."""
@@ -65,47 +53,39 @@ def in_memory_qdrant(monkeypatch: pytest.MonkeyPatch) -> QdrantClient:
 
 
 @pytest.fixture
-def mock_genai(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
-    """Mock the GenAI client so no real API calls are made."""
-    mock_client = MagicMock()
-    monkeypatch.setattr(rag_service, "_genai_client", mock_client)
-    monkeypatch.setattr(rag_service, "get_genai_client", lambda: mock_client)
-    # Force SDK path (not API key httpx path) so mocks are used
-    monkeypatch.setattr("src.config.settings.google_api_key", "")
-    return mock_client
+def mock_embed(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
+    """Mock _vertex_embed_via_api_key so no real API calls are made."""
+    monkeypatch.setattr("src.config.settings.google_api_key", "test-key")
+    mock_fn = MagicMock(
+        side_effect=lambda texts, task_type: [_fake_embedding() for _ in texts]
+    )
+    monkeypatch.setattr(rag_service, "_vertex_embed_via_api_key", mock_fn)
+    return mock_fn
 
 
 # --- Embedding Tests ---
 
 
 class TestEmbedText:
-    def test_returns_vector(self, mock_genai: MagicMock) -> None:
-        mock_genai.models.embed_content.return_value = _mock_embed_response(1)
+    def test_returns_vector(self, mock_embed: MagicMock) -> None:
         result = rag_service.embed_text("test query")
         assert len(result) == 768
         assert all(isinstance(v, float) for v in result)
 
-    def test_calls_with_query_task_type(self, mock_genai: MagicMock) -> None:
-        mock_genai.models.embed_content.return_value = _mock_embed_response(1)
+    def test_calls_with_query_task_type(self, mock_embed: MagicMock) -> None:
         rag_service.embed_text("test query")
-        call_kwargs = mock_genai.models.embed_content.call_args
-        config = call_kwargs.kwargs.get("config") or call_kwargs[1].get("config")
-        assert config.task_type == "RETRIEVAL_QUERY"
+        mock_embed.assert_called_once_with(["test query"], "RETRIEVAL_QUERY")
 
 
 class TestEmbedBatch:
-    def test_returns_multiple_vectors(self, mock_genai: MagicMock) -> None:
-        mock_genai.models.embed_content.return_value = _mock_embed_response(3)
+    def test_returns_multiple_vectors(self, mock_embed: MagicMock) -> None:
         result = rag_service.embed_batch(["a", "b", "c"])
         assert len(result) == 3
         assert all(len(v) == 768 for v in result)
 
-    def test_calls_with_document_task_type(self, mock_genai: MagicMock) -> None:
-        mock_genai.models.embed_content.return_value = _mock_embed_response(2)
+    def test_calls_with_document_task_type(self, mock_embed: MagicMock) -> None:
         rag_service.embed_batch(["a", "b"])
-        call_kwargs = mock_genai.models.embed_content.call_args
-        config = call_kwargs.kwargs.get("config") or call_kwargs[1].get("config")
-        assert config.task_type == "RETRIEVAL_DOCUMENT"
+        mock_embed.assert_called_once_with(["a", "b"], "RETRIEVAL_DOCUMENT")
 
 
 # --- Collection Management Tests ---
@@ -169,15 +149,12 @@ class TestUpsertChunks:
 
 class TestSearch:
     def test_returns_results(
-        self, in_memory_qdrant: QdrantClient, mock_genai: MagicMock
+        self, in_memory_qdrant: QdrantClient, mock_embed: MagicMock
     ) -> None:
         # Setup: create collection, upsert a chunk
         rag_service.ensure_collection()
         chunk = _make_chunk(text="Metformin dose adjustment for renal impairment")
         rag_service.upsert_chunks([chunk], [_fake_embedding()])
-
-        # Mock the query embedding to return the same vector (perfect match)
-        mock_genai.models.embed_content.return_value = _mock_embed_response(1)
 
         results = rag_service.search("metformin renal dosing")
         assert len(results) == 1
@@ -186,7 +163,7 @@ class TestSearch:
         assert results[0].score > 0
 
     def test_specialty_filter(
-        self, in_memory_qdrant: QdrantClient, mock_genai: MagicMock
+        self, in_memory_qdrant: QdrantClient, mock_embed: MagicMock
     ) -> None:
         rag_service.ensure_collection()
         endo_chunk = _make_chunk(
@@ -200,7 +177,6 @@ class TestSearch:
             [_fake_embedding(), _fake_embedding()],
         )
 
-        mock_genai.models.embed_content.return_value = _mock_embed_response(1)
         results = rag_service.search("diabetes", specialty="endocrinology")
         specialties = {r.chunk.specialty for r in results}
         assert "cardiology" not in specialties

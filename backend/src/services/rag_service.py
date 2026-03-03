@@ -6,8 +6,6 @@ import logging
 import uuid
 
 import httpx
-from google import genai
-from google.genai import types
 from qdrant_client import AsyncQdrantClient, QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -28,7 +26,6 @@ logger = logging.getLogger(__name__)
 
 _qdrant_client: QdrantClient | None = None
 _async_qdrant_client: AsyncQdrantClient | None = None
-_genai_client: genai.Client | None = None
 
 
 def _qdrant_kwargs() -> dict:
@@ -53,22 +50,6 @@ def get_async_qdrant_client() -> AsyncQdrantClient:
     if _async_qdrant_client is None:
         _async_qdrant_client = AsyncQdrantClient(**_qdrant_kwargs())
     return _async_qdrant_client
-
-
-def get_genai_client() -> genai.Client:
-    """Get or create the Google GenAI client (Vertex AI via ADC).
-
-    The same client instance exposes both sync (client.models) and async
-    (client.aio.models) interfaces.
-    """
-    global _genai_client
-    if _genai_client is None:
-        _genai_client = genai.Client(
-            vertexai=True,
-            project=settings.gcp_project_id,
-            location=settings.gcp_location,
-        )
-    return _genai_client
 
 
 # --- Embedding ---
@@ -120,25 +101,13 @@ async def _async_vertex_embed_via_api_key(
 
 def embed_text(text: str) -> list[float]:
     """Embed a single text string for query-time search."""
-    logger.debug(
-        "Embedding query (%d chars): %r",
+    logger.info(
+        "embed_text (%d chars): %r",
         len(text),
         text[:100] + ("..." if len(text) > 100 else ""),
     )
-    if settings.google_api_key:
-        vectors = _vertex_embed_via_api_key([text], "RETRIEVAL_QUERY")
-        vector = vectors[0]
-    else:
-        client = get_genai_client()
-        response = client.models.embed_content(
-            model=settings.embedding_model,
-            contents=[text],
-            config=types.EmbedContentConfig(
-                output_dimensionality=settings.embedding_dimensions,
-                task_type="RETRIEVAL_QUERY",
-            ),
-        )
-        vector = list(response.embeddings[0].values)
+    vectors = _vertex_embed_via_api_key([text], "RETRIEVAL_QUERY")
+    vector = vectors[0]
     logger.debug("Embedded query -> %d-dim vector %s", len(vector), vector[:4])
     return vector
 
@@ -146,24 +115,12 @@ def embed_text(text: str) -> list[float]:
 def embed_batch(texts: list[str]) -> list[list[float]]:
     """Embed a batch of texts for document indexing."""
     logger.info(
-        "Embedding batch of %d texts (model=%s, dims=%d)",
+        "embed_batch %d texts (model=%s, dims=%d)",
         len(texts),
         settings.embedding_model,
         settings.embedding_dimensions,
     )
-    if settings.google_api_key:
-        vectors = _vertex_embed_via_api_key(texts, "RETRIEVAL_DOCUMENT")
-    else:
-        client = get_genai_client()
-        response = client.models.embed_content(
-            model=settings.embedding_model,
-            contents=texts,
-            config=types.EmbedContentConfig(
-                output_dimensionality=settings.embedding_dimensions,
-                task_type="RETRIEVAL_DOCUMENT",
-            ),
-        )
-        vectors = [list(e.values) for e in response.embeddings]
+    vectors = _vertex_embed_via_api_key(texts, "RETRIEVAL_DOCUMENT")
     logger.info("Embedded %d texts -> %d vectors", len(texts), len(vectors))
     return vectors
 
@@ -318,25 +275,13 @@ def search(
 
 async def async_embed_text(text: str) -> list[float]:
     """Embed a single text string asynchronously (non-blocking)."""
-    logger.debug(
-        "Async embedding query (%d chars): %r",
+    logger.info(
+        "async_embed_text (%d chars): %r",
         len(text),
         text[:100] + ("..." if len(text) > 100 else ""),
     )
-    if settings.google_api_key:
-        vectors = await _async_vertex_embed_via_api_key([text], "RETRIEVAL_QUERY")
-        vector = vectors[0]
-    else:
-        client = get_genai_client()
-        response = await client.aio.models.embed_content(
-            model=settings.embedding_model,
-            contents=[text],
-            config=types.EmbedContentConfig(
-                output_dimensionality=settings.embedding_dimensions,
-                task_type="RETRIEVAL_QUERY",
-            ),
-        )
-        vector = list(response.embeddings[0].values)
+    vectors = await _async_vertex_embed_via_api_key([text], "RETRIEVAL_QUERY")
+    vector = vectors[0]
     logger.debug("Async embedded query -> %d-dim vector %s", len(vector), vector[:4])
     return vector
 
