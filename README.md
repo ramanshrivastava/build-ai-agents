@@ -73,11 +73,12 @@ This repo is a structured learning path from transformer basics to autonomous co
 
 ### Module 7: Personal Agents
 
-> Build your own autonomous agents — OpenClaw, personal setup agents, etc.
+> Build your own autonomous agents — personal tools, automation, AI-powered workflows.
 
 | Resource | What You'll Learn |
 |----------|-------------------|
-| `docs/agent-arch/11-PERSONAL-AGENTS.md` | *Coming soon* — OpenClaw, personal automation agents, setup agents |
+| [`zsh-ai-complete/`](zsh-ai-complete/) | **Live tool** — AI-powered zsh command completion with Claude CLI |
+| `docs/agent-arch/11-PERSONAL-AGENTS.md` | *Coming soon* — personal automation agents, setup agents |
 
 ### Not Covered (Explore on Your Own)
 
@@ -165,6 +166,8 @@ build-ai-agents/
 │   ├── SCOPE-V1.md           # V1 planning document
 │   ├── SCOPE-V2.md           # V2 planning document
 │   └── ARCHITECTURE.md       # System architecture vision
+├── zsh-ai-complete/           # AI-powered zsh completion (Module 7)
+│   └── ai-complete.zsh       # Source this in .zshrc
 ├── .claude/                   # Claude Code config
 │   ├── settings.json         # Hooks, permissions
 │   └── skills/               # 10 custom Claude Code skills
