@@ -25,10 +25,10 @@ If the last command failed, the prompt tells Claude to suggest a *fix or diagnos
 
 ```bash
 # Clone the repo (or just this directory)
-git clone https://github.com/raman-at-pieces/build-ai-agents-rag.git
+git clone https://github.com/ramanshrivastava/build-ai-agents.git
 
 # Add to your .zshrc
-echo 'source /path/to/build-ai-agents-rag/zsh-ai-complete/ai-complete.zsh' >> ~/.zshrc
+echo 'source /path/to/build-ai-agents/zsh-ai-complete/ai-complete.zsh' >> ~/.zshrc
 
 # Reload
 source ~/.zshrc

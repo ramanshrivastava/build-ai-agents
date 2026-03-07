@@ -1,6 +1,6 @@
 #!/usr/bin/env zsh
 # ai-complete.zsh — AI-powered zsh command completion using Claude CLI
-# https://github.com/raman-at-pieces/build-ai-agents-rag
+# https://github.com/ramanshrivastava/build-ai-agents
 #
 # Source this file in your .zshrc:
 #   source /path/to/ai-complete.zsh
