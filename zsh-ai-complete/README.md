@@ -7,12 +7,12 @@ AI-powered command completion for zsh using Claude CLI. Type a partial command *
 ## How It Works
 
 1. You type a partial command (e.g., `git`, `find`, `docker`) and press `Ctrl+G`
-2. The widget gathers context: CWD, git branch, project files, tmux terminal output, recent commands, and the last command's exit code
+2. The widget gathers context: CWD, git branch, project files, recent commands, and (if in tmux) terminal output and last exit code
 3. It calls Claude CLI with `--output-format stream-json`, streaming structured JSON in the background
 4. An animated braille spinner shows live tool-call labels (e.g., `Bash man git`, `Read package.json`) while Claude works
 5. The final command replaces your buffer — review it, then press Enter to run
 
-If the last command failed, the prompt tells Claude to suggest a *fix or diagnostic*, not repeat the failed command.
+If the last command failed (requires tmux), the prompt tells Claude to suggest a *fix or diagnostic*, not repeat the failed command.
 
 ## Prerequisites
 
@@ -90,7 +90,7 @@ ai-log          # View full log
 ai-log-tail     # Last 30 lines
 ```
 
-Useful for debugging, seeing what tools Claude used, or reviewing past suggestions.
+Useful for debugging, seeing what tools Claude used, or reviewing past suggestions. Note: setting `AI_COMPLETE_LOG=""` disables both logging and these aliases.
 
 ## Limitations
 

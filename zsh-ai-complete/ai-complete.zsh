@@ -133,7 +133,7 @@ COMMAND: $original_buffer" >"$stream_file" 2>"$stderr_file" &
     local claude_pid=$!
 
     # ── Ctrl+C cleanup ────────────────────────────────────────────
-    trap "kill $claude_pid 2>/dev/null; wait $claude_pid 2>/dev/null; rm -f $stream_file $stderr_file; BUFFER=$original_buffer; CURSOR=\${#original_buffer}; zle redisplay; trap - INT; return" INT
+    trap "kill $claude_pid 2>/dev/null; wait $claude_pid 2>/dev/null; rm -f ${(q)stream_file} ${(q)stderr_file}; BUFFER=${(q)original_buffer}; CURSOR=${#original_buffer}; zle redisplay; trap - INT; return" INT
 
     # ── Animated braille spinner ───────────────────────────────────
     local spinner_frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
@@ -182,7 +182,7 @@ COMMAND: $original_buffer" >"$stream_file" 2>"$stderr_file" &
     # Stream format (one JSON per line):
     # {"type":"assistant","message":{"content":[{"type":"text","text":"..."}]}}
     suggestion=$(command grep '"type"' "$stream_file" \
-        | jq -r 'select(.type=="assistant") | .message.content[] | select(.type=="text") | .text' 2>/dev/null \
+        | jq -rR 'try (fromjson | select(.type=="assistant") | .message.content[] | select(.type=="text") | .text)' 2>/dev/null \
         | tail -1)
 
     # ── Log the session ────────────────────────────────────────────
