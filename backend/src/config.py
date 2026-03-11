@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     # Google AI Embeddings
     # Google API key for Vertex AI embeddings (required for RAG).
     google_api_key: str = ""
-    gcp_project_id: str = "raman-gcp-project-k8s-dev"
+    gcp_project_id: str = ""
     gcp_location: str = "us-central1"
     embedding_model: str = "text-embedding-005"
     embedding_dimensions: int = 768
