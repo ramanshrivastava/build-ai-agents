@@ -259,17 +259,11 @@ The `-it` flags mean **interactive** + **TTY** (gives you a proper terminal). Wi
 ### Checking what is mounted where
 
 ```bash
-# See all mounts for a container
-docker inspect build_ai_agents_db --format '{{json .Mounts}}' | python3 -m json.tool
+# See all mounts for a container (pretty-printed)
+docker inspect build_ai_agents_db --format '{{json .Mounts}}' | jq
 
 # Quick volume-to-path mapping
-docker inspect build_ai_agents_db | python3 -c "
-import sys, json
-mounts = json.load(sys.stdin)[0]['Mounts']
-for m in mounts:
-    if m.get('Name'):
-        print(f\"{m['Name']} → {m['Destination']}\")
-"
+docker inspect build_ai_agents_db | jq -r '.[0].Mounts[] | select(.Name) | "\(.Name) → \(.Destination)"'
 ```
 
 ---
@@ -366,20 +360,20 @@ All commands below run from your **host machine** (not inside the container), si
 
 ```bash
 # List all collections
-curl -s http://localhost:6333/collections | python3 -m json.tool
+curl -s http://localhost:6333/collections | jq
 
 # Get collection details (schema, vector config, point count)
-curl -s http://localhost:6333/collections/clinical_guidelines | python3 -m json.tool
+curl -s http://localhost:6333/collections/clinical_guidelines | jq
 
 # Browse points (vectors + payloads) in a collection
 curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/scroll \
   -H "Content-Type: application/json" \
-  -d '{"limit": 5, "with_payload": true, "with_vector": false}' | python3 -m json.tool
+  -d '{"limit": 5, "with_payload": true, "with_vector": false}' | jq
 
 # Count points in a collection
 curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/count \
   -H "Content-Type: application/json" \
-  -d '{}' | python3 -m json.tool
+  -d '{}' | jq
 
 # Search for similar vectors (replace the vector with a real embedding)
 curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/query \
@@ -388,16 +382,16 @@ curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/que
     "query": [0.1, 0.2, ...],
     "limit": 3,
     "with_payload": true
-  }' | python3 -m json.tool
+  }' | jq
 
 # Get a specific point by ID
-curl -s http://localhost:6333/collections/clinical_guidelines/points/1 | python3 -m json.tool
+curl -s http://localhost:6333/collections/clinical_guidelines/points/1 | jq
 
 # Health check
 curl -s http://localhost:6333/healthz
 
 # Qdrant server info (version, commit)
-curl -s http://localhost:6333 | python3 -m json.tool
+curl -s http://localhost:6333 | jq
 ```
 
 ### Inspecting via Python (from your app's venv)
@@ -531,7 +525,7 @@ Before panicking:
 docker volume ls | grep -E "pgdata|qdrant"
 
 # 2. Check what the running container is actually using
-docker inspect build_ai_agents_db --format '{{json .Mounts}}' | python3 -m json.tool
+docker inspect build_ai_agents_db --format '{{json .Mounts}}' | jq
 
 # 3. If multiple volumes exist, check each for data
 docker run --rm -v VOLUME_NAME:/data alpine du -sh /data
@@ -610,9 +604,9 @@ docker compose up -d
 | Postgres shell | `docker exec -it build_ai_agents_db psql -U user -d build_ai_agents` |
 | List tables | `\dt` (inside psql) |
 | Describe table | `\d patients` (inside psql) |
-| Qdrant collections | `curl -s http://localhost:6333/collections \| python3 -m json.tool` |
+| Qdrant collections | `curl -s http://localhost:6333/collections \| jq` |
 | Qdrant dashboard | Open `http://localhost:6333/dashboard` in browser |
-| Browse Qdrant points | `curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/scroll -H "Content-Type: application/json" -d '{"limit": 5, "with_payload": true, "with_vector": false}' \| python3 -m json.tool` |
+| Browse Qdrant points | `curl -s -X POST http://localhost:6333/collections/clinical_guidelines/points/scroll -H "Content-Type: application/json" -d '{"limit": 5, "with_payload": true, "with_vector": false}' \| jq` |
 
 ### Emergency commands
 
