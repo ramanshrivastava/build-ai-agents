@@ -14,8 +14,27 @@
       "type": "python",
       "request": "launch",
       "module": "uvicorn",
-      "args": ["src.main:app", "--reload"],
+      "args": [
+        "src.main:app",
+        "--reload"
+      ],
       "cwd": "${workspaceFolder}/backend",
+      "justMyCode": false
+    },
+    {
+      "name": "Attach: FastAPI (debugpy 5678)",
+      "type": "python",
+      "request": "attach",
+      "connect": {
+        "host": "127.0.0.1",
+        "port": 5678
+      },
+      "pathMappings": [
+        {
+          "localRoot": "${workspaceFolder}/backend",
+          "remoteRoot": "${workspaceFolder}/backend"
+        }
+      ],
       "justMyCode": false
     }
   ]
