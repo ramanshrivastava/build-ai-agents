@@ -539,6 +539,9 @@ A2A: Agent → Agent (autonomous, stateful, potentially long-running)
      clarifying questions, eventually returns a structured report)
 ```
 
+> [!WARNING]
+> **Reality check (a2a-protocol) —** Learn A2A's *concepts* (agent discovery, task lifecycle, opaque execution) but be conservative about anchoring production architecture on the protocol itself. As of late 2026, MCP has substantially broader cross-vendor implementation than A2A — clients and servers ship from Anthropic, OpenAI, Microsoft, JetBrains, and most agent IDEs, while interoperable A2A deployments outside Google's launch coalition remain rare. The patterns A2A formalizes (cards, task states, JSON-RPC over HTTP/SSE) are valuable independent of the spec; production multi-agent systems today are usually built with direct HTTP/gRPC or message queues, not A2A. Re-evaluate when there are A2A deployments you can point to outside marketing material.
+
 ### Agent Cards
 
 In A2A, every agent publishes an **Agent Card** — a JSON document that describes the agent's identity, capabilities, and how to communicate with it. Think of it as a business card for AI agents.
