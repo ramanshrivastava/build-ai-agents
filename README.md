@@ -80,6 +80,19 @@ This repo is a structured learning path from transformer basics to autonomous co
 | [`zsh-ai-complete/`](zsh-ai-complete/) | **Live tool** — AI-powered zsh command completion with Claude CLI |
 | `docs/agent-arch/11-PERSONAL-AGENTS.md` | *Coming soon* — personal automation agents, setup agents |
 
+### Module 8: Agent Operations
+
+> Production-grade observability, security, cost, and reliability for agentic systems. The boring middle that keeps shipped agents alive.
+
+| Resource | What You'll Learn |
+|----------|-------------------|
+| [`docs/agent-ops/00-OVERVIEW.md`](docs/agent-ops/00-OVERVIEW.md) | Module overview, lesson outline, why a dedicated module |
+| `docs/agent-ops/01-TRACING-AND-OBSERVABILITY.md` | *In progress* — span design, tagging, Langfuse/Helicone/OTel |
+| `docs/agent-ops/02-COST-ENGINEERING.md` | *In progress* — token accounting, prompt-caching ROI, batch API |
+| `docs/agent-ops/03-PRODUCTION-EVALS-AND-FORENSICS.md` | *In progress* — regression suites, replay, real-traffic eval |
+| `docs/agent-ops/04-PROMPT-INJECTION-AND-SECURITY.md` | *In progress* — direct + indirect injection, tool-permission scoping |
+| `docs/agent-ops/05-OPERATIONAL-PATTERNS.md` | *In progress* — circuit breakers, fallbacks, latency budgets |
+
 ### Not Covered (Explore on Your Own)
 
 - **Low-code agent builders** — N8N is very popular for visual workflow automation
