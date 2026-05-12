@@ -1,0 +1,177 @@
+"""Reference integration: E2B sandbox-backed lab trend analyzer.
+
+This is a `.example` file — it is NOT imported anywhere. Drop it into
+`backend/src/agents/sandbox_lab_trends.py` (without the `.example` suffix)
+and add `pip install e2b` to your dependencies if you want to enable the
+new behavior.
+
+What this adds:
+    A "lab trend analyzer" tool the doctor agent can call when asked
+    questions like "what's this patient's HbA1c trend over the last six
+    months?" Instead of having Claude do unreliable arithmetic in its
+    head, the agent writes Python that runs in an E2B Firecracker
+    microVM, computes the actual linear regression, and returns the
+    numerical result for the agent to narrate.
+
+Why E2B:
+    - Free $100 credits at signup, no credit card required (good for learners)
+    - Cheapest cold-start in our cross-provider benchmark (~756ms median)
+        See https://github.com/ramanshrivastava/sandboxes for full numbers
+    - Simple dependency: `pip install e2b`, single env var `E2B_API_KEY`
+    - Tier 5 (hardware microVM) — appropriate for code we don't fully trust
+    - Strong Python support — pandas, NumPy, scipy work out of the box
+
+Threat model:
+    The agent generates Python over patient JSON. We don't fully trust
+    the model's code, so we want isolation. We don't need network
+    egress (purely numerical work), so we set `network_policy="deny-all"`.
+    Sandbox is short-lived (single computation, then `kill`).
+
+Caveats:
+    - E2B's snapshot-fork primitive captures /dev/shm. Not relevant here
+      (we don't snapshot), but be aware if you extend this to fanout.
+      See https://github.com/ramanshrivastava/sandboxes/blob/main/fork_audit/results_fork.md
+    - Cold-start is real. ~750ms+ to spin up a sandbox per call. For
+      repeated computations within one agent run, reuse the sandbox or
+      switch to a persistent-shell pattern.
+    - Patient JSON is sent into the sandbox. If your data classification
+      forbids that, use Modal/Vercel which run on different infra, or
+      run the sandbox in your own VPC.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TrendResult:
+    metric: str
+    samples: int
+    slope_per_year: float | None
+    latest: float | None
+    earliest: float | None
+    pct_change: float | None
+    error: str | None = None
+
+
+def compute_lab_trends(
+    patient_json: str,
+    metrics: list[str] | None = None,
+) -> dict[str, TrendResult]:
+    """Run trend analysis on a patient's lab history inside an E2B sandbox.
+
+    Args:
+        patient_json: serialized Patient (matches src.models.schemas.Patient)
+        metrics: which lab tests to analyze (default: HbA1c, eGFR, LDL, weight)
+
+    Returns:
+        Map of metric name -> TrendResult with slope, %change, sample count.
+    """
+    from e2b import Sandbox  # noqa: PLC0415 — lazy import keeps this file optional
+
+    metrics = metrics or ["HbA1c", "eGFR", "LDL", "weight"]
+
+    # The Python code we run inside the sandbox. Uses NumPy + datetime parsing.
+    # Kept inline so the snippet is auditable end-to-end.
+    analysis_code = f"""
+import json
+from datetime import datetime
+from collections import defaultdict
+
+import numpy as np
+
+patient = json.loads({json.dumps(patient_json)!r})
+metrics_of_interest = {metrics!r}
+
+# Group lab results by test name; each result has 'name', 'value', 'date'.
+by_metric = defaultdict(list)
+for r in patient.get("lab_results", []):
+    name = r.get("name")
+    if name not in metrics_of_interest:
+        continue
+    try:
+        val = float(r["value"])
+        ts = datetime.fromisoformat(r["date"]).timestamp()
+        by_metric[name].append((ts, val))
+    except (KeyError, ValueError, TypeError):
+        continue
+
+results = {{}}
+for metric, points in by_metric.items():
+    points.sort()
+    if len(points) < 2:
+        results[metric] = {{"samples": len(points), "error": "need at least 2 points"}}
+        continue
+    ts = np.array([p[0] for p in points])
+    vals = np.array([p[1] for p in points])
+    # Linear regression slope in units-per-year
+    slope_per_sec, intercept = np.polyfit(ts, vals, 1)
+    slope_per_year = slope_per_sec * 365.25 * 24 * 3600
+    earliest, latest = float(vals[0]), float(vals[-1])
+    pct = (latest - earliest) / earliest * 100 if earliest != 0 else None
+    results[metric] = {{
+        "samples": len(points),
+        "slope_per_year": float(slope_per_year),
+        "latest": latest,
+        "earliest": earliest,
+        "pct_change": pct,
+    }}
+
+print(json.dumps(results))
+"""
+
+    with Sandbox.create(timeout=60, network_policy="deny-all") as sb:
+        run = sb.commands.run(f"python3 -c {json.dumps(analysis_code)}")
+        if run.exit_code != 0:
+            logger.warning(
+                "lab-trend sandbox failed: exit=%s stderr=%s",
+                run.exit_code,
+                run.stderr[-300:] if run.stderr else "",
+            )
+            return {}
+
+        try:
+            raw = json.loads(run.stdout)
+        except json.JSONDecodeError as e:
+            logger.warning("lab-trend sandbox produced invalid JSON: %s", e)
+            return {}
+
+    out: dict[str, TrendResult] = {}
+    for metric, fields in raw.items():
+        out[metric] = TrendResult(
+            metric=metric,
+            samples=fields.get("samples", 0),
+            slope_per_year=fields.get("slope_per_year"),
+            latest=fields.get("latest"),
+            earliest=fields.get("earliest"),
+            pct_change=fields.get("pct_change"),
+            error=fields.get("error"),
+        )
+    return out
+
+
+# How to wire this into the existing briefing agent (one-line change):
+#
+# In src/agents/briefing_agent.py, add a tool the agent can call:
+#
+#     from src.agents.sandbox_lab_trends import compute_lab_trends
+#     from claude_agent_sdk import tool
+#
+#     @tool(
+#         "lab_trends",
+#         "Compute slope and % change for HbA1c / eGFR / LDL / weight",
+#         {"patient_json": str}
+#     )
+#     async def lab_trends_tool(args: dict) -> dict:
+#         results = compute_lab_trends(args["patient_json"])
+#         return {"content": [{"type": "text", "text": json.dumps(
+#             {m: r.__dict__ for m, r in results.items()}
+#         )}]}
+#
+# Then add `lab_trends_tool` to the tool list in the agent's options. The
+# agent will invoke it when the briefing prompt asks for trend information.

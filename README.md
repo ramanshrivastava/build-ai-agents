@@ -57,7 +57,9 @@ This repo is a structured learning path from transformer basics to autonomous co
 | Resource | What You'll Learn |
 |----------|-------------------|
 | [`.claude/skills/`](.claude/skills/) | **Live examples** — custom Claude Code skills |
-| `docs/agent-arch/09-SKILLS-AND-SANDBOXES.md` | *Coming soon* — skill systems, sandboxed execution |
+| [`docs/agent-arch/09-SKILLS-AND-SANDBOXES.md`](docs/agent-arch/09-SKILLS-AND-SANDBOXES.md) | Sandbox tiers, scope (code/tool/agent), provider tradeoffs |
+| [`backend/src/agents/sandbox_lab_trends.py.example`](backend/src/agents/sandbox_lab_trends.py.example) | **Reference integration** — E2B sandbox-backed lab-trend analyzer for the doctor agent |
+| [`ramanshrivastava/sandboxes`](https://github.com/ramanshrivastava/sandboxes) | **Companion repo** — cold-start benchmarks + snapshot-fork audit across 7+ providers (E2B, Vercel, Modal, Daytona, Blaxel, Runloop, Cloudflare) |
 
 ### Module 6: Coding Agents
 
