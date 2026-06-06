@@ -194,11 +194,69 @@ async def test_list_event_ids_answers_orphaned_tool_calls():
     seen = await svc._list_event_ids(client, "sess_123")
 
     assert seen == {"tool_orphan", "tool_done", "res_1"}
-    assert client.beta.sessions.events.send.await_count == 1
-    sent = client.beta.sessions.events.send.await_args.kwargs["events"][0]
-    assert sent["type"] == "user.custom_tool_result"
-    assert sent["custom_tool_use_id"] == "tool_orphan"
-    assert sent["is_error"] is True
+    # One error result for the orphan, then an interrupt to settle the session.
+    assert client.beta.sessions.events.send.await_count == 2
+    first, second = [
+        call.kwargs["events"][0]
+        for call in client.beta.sessions.events.send.await_args_list
+    ]
+    assert first["type"] == "user.custom_tool_result"
+    assert first["custom_tool_use_id"] == "tool_orphan"
+    assert first["is_error"] is True
+    assert second["type"] == "user.interrupt"
+
+
+async def test_wait_abandons_turn_when_tool_round_limit_exceeded(monkeypatch):
+    monkeypatch.setattr(svc.settings, "managed_agent_max_tool_rounds", 0)
+    tool_event = SimpleNamespace(
+        id="tool_over_budget",
+        type="agent.custom_tool_use",
+        name="search_clinical_guidelines",
+        input={"query": "diabetes"},
+    )
+    events = _AsyncEvents([tool_event])
+    client = _client_with_events(events)
+
+    with pytest.raises(BriefingGenerationError) as exc_info:
+        await svc._wait_for_briefing_json(client, "sess_123", set())
+
+    assert exc_info.value.code == "MANAGED_AGENTS_TIMEOUT"
+    # The over-budget tool call is answered, then the turn is interrupted,
+    # so the session is left idle instead of waiting on a result forever.
+    assert client.beta.sessions.events.send.await_count == 2
+    first, second = [
+        call.kwargs["events"][0]
+        for call in client.beta.sessions.events.send.await_args_list
+    ]
+    assert first["type"] == "user.custom_tool_result"
+    assert first["custom_tool_use_id"] == "tool_over_budget"
+    assert first["is_error"] is True
+    assert second["type"] == "user.interrupt"
+
+
+async def test_send_patient_message_retries_while_session_settles(monkeypatch):
+    import httpx
+    from anthropic import BadRequestError
+
+    request = httpx.Request("POST", "http://test/v1/sessions/sess_123/events")
+    response = httpx.Response(400, request=request)
+    waiting_error = BadRequestError(
+        "Invalid user.message event: waiting on responses to events [sevt_1]",
+        response=response,
+        body=None,
+    )
+    events = _AsyncEvents([], [])
+    client = _client_with_events(events)
+    client.beta.sessions.events.send = AsyncMock(
+        side_effect=[waiting_error, SimpleNamespace()]
+    )
+    monkeypatch.setattr(svc.asyncio, "sleep", AsyncMock())
+
+    await svc._send_patient_message_with_recovery(client, "sess_123", "{}", set())
+
+    assert client.beta.sessions.events.send.await_count == 2
+    last = client.beta.sessions.events.send.await_args.kwargs["events"][0]
+    assert last["type"] == "user.message"
 
 
 async def test_generate_validates_final_schema(

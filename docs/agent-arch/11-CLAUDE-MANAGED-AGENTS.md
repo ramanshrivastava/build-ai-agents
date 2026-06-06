@@ -247,7 +247,7 @@ the *second* request, the *slow* tool call, or the *malformed* response.
 ### 7.4 Bound every loop that waits on a remote session
 
 > [!WARNING]
-> **Reality check (unbounded-loops) —** An event loop polling a remote session has two ways to run forever: the session never goes idle, or the agent keeps calling tools. The live code bounds both — a wall-clock deadline (`managed_agent_session_timeout_seconds`, default 120s) and a tool-round ceiling (`managed_agent_max_tool_rounds`, default 8) — and converts each into a typed `MANAGED_AGENTS_TIMEOUT` error. It also handles `session.error` events explicitly. "It worked in the demo" is not evidence your loop terminates; the bounds are what make this production-shaped code instead of a hope.
+> **Reality check (unbounded-loops) —** An event loop polling a remote session has two ways to run forever: the session never goes idle, or the agent keeps calling tools. The live code bounds both — a wall-clock deadline (`managed_agent_session_timeout_seconds`, default 240s) and a tool-round ceiling (`managed_agent_max_tool_rounds`, default 16) — and converts each into a typed `MANAGED_AGENTS_TIMEOUT` error. It also handles `session.error` events explicitly. And bailing out has its own hygiene: raising while a tool call is unanswered would wedge the session, so the code answers the over-budget call with an error result and sends `user.interrupt` before raising — the abandoned session is left idle, not waiting forever on a result that will never come. "It worked in the demo" is not evidence your loop terminates; the bounds are what make this production-shaped code instead of a hope.
 
 ### 7.5 Tool latency is polling-bound, and every tool call must be answered
 

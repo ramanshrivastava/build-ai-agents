@@ -9,7 +9,13 @@ import logging
 import re
 from typing import Any
 
-from anthropic import APIConnectionError, APIError, APITimeoutError, AsyncAnthropic
+from anthropic import (
+    APIConnectionError,
+    APIError,
+    APITimeoutError,
+    AsyncAnthropic,
+    BadRequestError,
+)
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,7 +167,8 @@ async def _list_event_ids(client: AsyncAnthropic, session_id: str) -> set[str]:
         elif event_type == "user.custom_tool_result":
             answered_ids.add(getattr(event, "custom_tool_use_id", ""))
 
-    for orphan_id in tool_use_ids - answered_ids:
+    orphan_ids = tool_use_ids - answered_ids
+    for orphan_id in orphan_ids:
         logger.warning(
             "Answering orphaned tool call %s in session %s", orphan_id, session_id
         )
@@ -173,6 +180,10 @@ async def _list_event_ids(client: AsyncAnthropic, session_id: str) -> set[str]:
             "the latest patient message.",
             is_error=True,
         )
+    if orphan_ids:
+        # Answering an orphan resumes the stale turn; interrupt it so the
+        # session settles to idle before the new patient message.
+        await _interrupt_session(client, session_id)
     return seen
 
 
@@ -202,6 +213,37 @@ async def _send_patient_message(
     )
 
 
+async def _send_patient_message_with_recovery(
+    client: AsyncAnthropic,
+    session_id: str,
+    patient_json: str,
+    seen: set[str],
+) -> None:
+    """Send the patient message, healing a session still settling after recovery.
+
+    Right after orphaned tool calls are answered, the API can briefly keep the
+    session in a waiting/running state and reject `user.message`. Re-run the
+    recovery pass and retry with backoff before giving up.
+    """
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            await _send_patient_message(client, session_id, patient_json)
+            return
+        except BadRequestError as exc:
+            if "waiting on responses" not in str(exc) or attempt == max_attempts:
+                raise
+            logger.warning(
+                "Session %s not ready for user.message (attempt %d/%d): %s",
+                session_id,
+                attempt,
+                max_attempts,
+                exc,
+            )
+            await asyncio.sleep(float(attempt))
+            seen |= await _list_event_ids(client, session_id)
+
+
 async def _send_tool_result(
     client: AsyncAnthropic,
     session_id: str,
@@ -221,6 +263,42 @@ async def _send_tool_result(
             }
         ],
     )
+
+
+async def _interrupt_session(client: AsyncAnthropic, session_id: str) -> None:
+    """Best-effort interrupt so a bail-out leaves the session idle, not wedged."""
+    try:
+        await client.beta.sessions.events.send(
+            session_id,
+            events=[{"type": "user.interrupt"}],
+        )
+    except (APIConnectionError, APITimeoutError, APIError) as exc:
+        logger.warning("Failed to interrupt session %s: %s", session_id, exc)
+
+
+async def _abandon_turn(
+    client: AsyncAnthropic,
+    session_id: str,
+    tool_use_id: str,
+) -> None:
+    """Answer the pending tool call with an error, then interrupt the turn.
+
+    Raising out of the event loop while a tool call is unanswered would wedge
+    the session: it keeps waiting for the result and rejects new user messages.
+    """
+    try:
+        await _send_tool_result(
+            client,
+            session_id,
+            tool_use_id,
+            "Tool budget exhausted; stopping this run.",
+            is_error=True,
+        )
+    except (APIConnectionError, APITimeoutError, APIError) as exc:
+        logger.warning(
+            "Failed to answer tool call %s during bail-out: %s", tool_use_id, exc
+        )
+    await _interrupt_session(client, session_id)
 
 
 async def _handle_custom_tool(
@@ -301,6 +379,7 @@ async def _wait_for_briefing_json(
             elif event_type == "agent.custom_tool_use":
                 if event_id not in handled_tool_ids:
                     if len(handled_tool_ids) >= settings.managed_agent_max_tool_rounds:
+                        await _abandon_turn(client, session_id, event_id)
                         raise BriefingGenerationError(
                             code="MANAGED_AGENTS_TIMEOUT",
                             message="Managed agent exceeded custom tool round limit",
@@ -328,6 +407,8 @@ async def _wait_for_briefing_json(
         if not made_progress:
             await asyncio.sleep(0.5)
 
+    # Leave the session idle rather than mid-turn before giving up.
+    await _interrupt_session(client, session_id)
     raise BriefingGenerationError(
         code="MANAGED_AGENTS_TIMEOUT",
         message="Timed out waiting for managed agent result",
@@ -355,7 +436,12 @@ async def generate_managed_briefing(
     try:
         mapping = await _get_or_create_session(db, client, patient)
         seen = await _list_event_ids(client, mapping.session_id)
-        await _send_patient_message(client, mapping.session_id, patient_json)
+        await _send_patient_message_with_recovery(
+            client,
+            mapping.session_id,
+            patient_json,
+            seen,
+        )
         structured_output = await _wait_for_briefing_json(
             client,
             mapping.session_id,
