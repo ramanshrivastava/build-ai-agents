@@ -84,6 +84,7 @@ TOOL_SCHEMA: dict[str, Any] = {
 
 
 def _configured() -> bool:
+    """Return True when all Managed Agents settings are present."""
     return bool(
         settings.anthropic_api_key
         and settings.managed_agent_id
@@ -92,6 +93,7 @@ def _configured() -> bool:
 
 
 def _client() -> AsyncAnthropic:
+    """Build an AsyncAnthropic client from settings."""
     return AsyncAnthropic(api_key=settings.anthropic_api_key)
 
 
@@ -175,6 +177,7 @@ async def _list_event_ids(client: AsyncAnthropic, session_id: str) -> set[str]:
 
 
 def _patient_prompt(patient_json: str) -> str:
+    """Build the per-run user message wrapping the latest patient JSON."""
     return (
         "Generate a structured pre-consultation briefing for this synthetic "
         "patient. Use the latest JSON below as the source of truth for this run. "
