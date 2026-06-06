@@ -119,6 +119,23 @@ except BaseExceptionGroup as eg:
 
 See `src/agents/briefing_agent.py:289-305` for the production implementation.
 
+### Nested CLI: backend fails with "Agent process failed: exit code 1" inside Claude Code
+
+The SDK spawns a Claude Code CLI subprocess. If you launch the backend from
+*inside* a Claude Code session (agent-driven testing, scripts), the subprocess
+inherits `CLAUDECODE=1` and friends, detects nesting, and exits 1 — every SDK
+briefing returns 500 even though the code is fine. Strip the env vars when
+launching:
+
+```bash
+env -u CLAUDECODE -u CLAUDE_CODE_ENTRYPOINT -u CLAUDE_CODE_SESSION_ID \
+    uv run uvicorn src.main:app --reload
+```
+
+Running from a normal terminal is unaffected. The Managed Agents path
+(`managed_briefing_service.py`) is also unaffected — it calls the HTTP API
+directly and spawns no CLI.
+
 ## Environment Variables
 
 Required in `.env` (see `.env.example`):
