@@ -1,6 +1,7 @@
 # Claude Agent SDK
 
-**Part 10 of 11: Agent Architecture & AI Model Internals Series**
+**Part 10: Agent Architecture & AI Model Internals Series**
+**Module 4.1 — Autonomous Agents: build the harness yourself** (Module 4.2, the managed-runtime path, is [11-CLAUDE-MANAGED-AGENTS.md](11-CLAUDE-MANAGED-AGENTS.md))
 **AI Doctor Assistant Project**
 
 ---
@@ -45,6 +46,7 @@ What this document is NOT:
 
 - A framework comparison. Doc 07 covers that in the ["When to Use What" decision tree](07-TOOL-USE-AND-AGENTIC-LOOP.md#when-to-use-what) and the [comparison table](07-TOOL-USE-AND-AGENTIC-LOOP.md#comparison-table). This document goes deep on the SDK itself.
 - A tutorial for the raw Anthropic API. Doc 01 covers [authentication](01-ANTHROPIC-API-FUNDAMENTALS.md#2-authentication), [messages](01-ANTHROPIC-API-FUNDAMENTALS.md#4-the-messages-array), and [parameters](01-ANTHROPIC-API-FUNDAMENTALS.md#7-configuration-parameters).
+- A Managed Agents guide. Doc 11 covers [running the same AI Doctor agent through Claude Managed Agents](11-CLAUDE-MANAGED-AGENTS.md).
 
 ---
 

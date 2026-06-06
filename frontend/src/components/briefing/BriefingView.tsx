@@ -1,6 +1,6 @@
 import { m } from "motion/react";
 import { RefreshCw } from "lucide-react";
-import type { PatientBriefing } from "@/types";
+import type { BriefingRuntime, PatientBriefing } from "@/types";
 import { formatRelativeTime } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -39,12 +39,19 @@ const badgeVariants = {
 
 interface BriefingViewProps {
   briefing: PatientBriefing;
+  runtime: BriefingRuntime;
   onRegenerate: () => void;
   isRegenerating: boolean;
 }
 
-export function BriefingView({ briefing, onRegenerate, isRegenerating }: BriefingViewProps) {
+export function BriefingView({
+  briefing,
+  runtime,
+  onRegenerate,
+  isRegenerating,
+}: BriefingViewProps) {
   const sortedActions = [...briefing.suggested_actions].sort((a, b) => a.priority - b.priority);
+  const runtimeLabel = runtime === "managed" ? "Managed Agents" : "Agent SDK";
 
   return (
     <m.div
@@ -55,9 +62,12 @@ export function BriefingView({ briefing, onRegenerate, isRegenerating }: Briefin
     >
       {/* Header */}
       <m.div className="flex items-center justify-between" variants={sectionVariants}>
-        <p className="text-sm text-muted-foreground">
-          {formatRelativeTime(briefing.generated_at)}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-muted-foreground">
+            {formatRelativeTime(briefing.generated_at)}
+          </p>
+          <Badge variant="outline">{runtimeLabel}</Badge>
+        </div>
         <m.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
           <Button variant="outline" size="sm" onClick={onRegenerate} disabled={isRegenerating}>
             <RefreshCw className={isRegenerating ? "animate-spin" : ""} />

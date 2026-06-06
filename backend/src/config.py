@@ -15,6 +15,14 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/build_ai_agents"
     debug: bool = False
 
+    # Claude Managed Agents beta
+    managed_agent_id: str = ""
+    managed_environment_id: str = ""
+    # Live runs of the briefing use ~8 tool calls in ~115s on a fresh session;
+    # reused sessions with history need headroom on both budgets.
+    managed_agent_session_timeout_seconds: int = 240
+    managed_agent_max_tool_rounds: int = 16
+
     # RAG / Qdrant
     qdrant_url: str = "http://localhost:6333"
     qdrant_collection: str = "clinical_guidelines"

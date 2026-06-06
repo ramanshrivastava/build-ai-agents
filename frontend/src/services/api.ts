@@ -1,4 +1,4 @@
-import type { ApiErrorDetail, Patient, PatientBriefing } from "@/types";
+import type { ApiErrorDetail, BriefingRuntime, Patient, PatientBriefing } from "@/types";
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 
@@ -41,11 +41,15 @@ export const api = {
 
   getPatient: (id: number) => fetchJson<Patient>(`/api/v1/patients/${id}`),
 
-  generateBriefing: (patientId: number) => {
+  generateBriefing: (patientId: number, runtime: BriefingRuntime = "sdk") => {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 120_000);
+    const endpoint =
+      runtime === "managed"
+        ? `/api/v1/patients/${patientId}/briefing/managed`
+        : `/api/v1/patients/${patientId}/briefing`;
 
-    return fetchJson<PatientBriefing>(`/api/v1/patients/${patientId}/briefing`, {
+    return fetchJson<PatientBriefing>(endpoint, {
       method: "POST",
       signal: controller.signal,
     }).finally(() => clearTimeout(timeout));

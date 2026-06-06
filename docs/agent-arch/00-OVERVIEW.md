@@ -63,10 +63,11 @@ You do **not** need:
 | **2: RAG** | **04-VECTOR-DATABASES-AND-EMBEDDINGS.md** | Vector Databases & Embeddings | Embedding models, similarity metrics, vector stores, Qdrant |
 | | **05-RAG-ARCHITECTURE-AND-PIPELINE.md** | RAG Architecture & Pipeline | Document ingestion, retrieval, agent-tool RAG, multi-turn search |
 | | **06-RAG-EVALUATION-AND-PRODUCTION.md** | RAG Evaluation & Production | Retrieval metrics, testing strategies, failure modes, production concerns |
-| **3: Agents** | **07-TOOL-USE-AND-AGENTIC-LOOP.md** | Tool Use & The Agentic Loop | Tool definitions, JSON Schema, the two-step dance, multi-tool, frameworks |
+| **3: Agentic Workflows** | **07-TOOL-USE-AND-AGENTIC-LOOP.md** | Tool Use & The Agentic Loop | Tool definitions, JSON Schema, the two-step dance, multi-tool, frameworks |
 | | **08-PROMPT-CACHING-AND-OPTIMIZATION.md** | Prompt Caching & Optimization | KV cache internals, API prompt caching, cost and latency strategies |
 | | **09-MCP-AND-A2A-PROTOCOLS.md** | MCP & A2A Protocols | Model Context Protocol, Agent2Agent, tool/agent communication standards |
-| | **10-CLAUDE-AGENT-SDK.md** | Claude Agent SDK | SDK architecture, query() internals, structured output, error handling, testing, permissions |
+| **4: Autonomous Agents** | **10-CLAUDE-AGENT-SDK.md** | Claude Agent SDK (Module 4.1) | Build the harness yourself: SDK architecture, query() internals, structured output, error handling, testing, permissions |
+| | **11-CLAUDE-MANAGED-AGENTS.md** | Claude Managed Agents (Module 4.2) | Rent the runtime: same AI Doctor agent through Anthropic's managed runtime, custom-tool events, session reuse, deployment tradeoffs |
 
 ---
 
@@ -77,10 +78,11 @@ You do **not** need:
 **Goal**: Ship applications that use LLM APIs effectively.
 
 ```
-00 → 01 → 07 → 10 → 08 → 09
+00 → 01 → 07 → 10 → 11 → 08 → 09
 │    │    │    │     │    │
 │    │    │    │     │    └─ MCP/A2A: Connect agents to tools and other agents
 │    │    │    │     └─ Caching: Cut costs 90% with prompt caching
+│    │    │    ├─ Managed Agents: Same agent through a hosted runtime
 │    │    │    └─ Agent SDK: Deep dive into query(), structured output, testing
 │    │    └─ Tool use: Let Claude call functions and APIs
 │    └─ API basics: Authentication, messages, models, parameters
@@ -94,8 +96,9 @@ You do **not** need:
 **Goal**: Understand how to give AI agents access to domain knowledge through vector search.
 
 ```
-00 → 01 → 02 → 04 → 05 → 06 → 07 → 10
+00 → 01 → 02 → 04 → 05 → 06 → 07 → 10 → 11
 │    │    │    │    │    │    │    │
+│    │    │    │    │    │    │    ├─ Managed Agents: Same RAG tool as a custom-tool event
 │    │    │    │    │    │    │    └─ Agent SDK: How the RAG tool integrates
 │    │    │    │    │    │    └─ Tool use: How the agent calls the search tool
 │    │    │    │    │    └─ Evaluation: Testing and production RAG
@@ -127,10 +130,11 @@ You do **not** need:
 **Goal**: Validate AI/ML engineering knowledge with both practical API skills and theoretical depth.
 
 ```
-01 → 07 → 10 → 02 → 03
+01 → 07 → 10 → 11 → 02 → 03
 │    │    │    │    │
 │    │    │    │    └─ Training pipeline: Pre-training → RLHF → deployment
 │    │    │    └─ Architecture: "Explain the transformer" (the most fundamental question)
+│    │    ├─ Managed Agents: custom-tool event loop and deployment tradeoffs
 │    │    └─ Agent SDK: SDK internals, testing, structured output patterns
 │    └─ Tool use: Agentic patterns (core to modern AI system design)
 └─ API fundamentals: Show you can actually build with these systems
@@ -203,7 +207,8 @@ These ground abstract concepts in the actual application.
 4. **Read 07** and run `scripts/test-tool-call-opus-step2.sh` to see the full tool-use round trip.
 5. **Read 08** to understand why caching changes the economics of LLM applications.
 6. **Read 10** to understand the Claude Agent SDK in depth -- how `query()` works, structured output, testing, and error handling.
-7. **Read 09** when you need to connect agents to external tools or other agents.
+7. **Read 11** to compare the SDK path with Claude Managed Agents using the same AI Doctor briefing flow.
+8. **Read 09** when you need to connect agents to external tools or other agents.
 
 ### For Building with LLM APIs
 
@@ -211,8 +216,9 @@ These ground abstract concepts in the actual application.
 2. Read **07** to implement tool use (required for most production applications).
 3. Read **04-06** to add RAG capabilities -- vector search, retrieval pipelines, and testing.
 4. Read **10** for Claude Agent SDK patterns -- structured output, error handling, testing, permissions.
-5. Read **08** before going to production -- caching can cut your API bill by 90%.
-6. Read **09** if building multi-agent systems or integrating with MCP-compatible tools.
+5. Read **11** for the managed-runtime alternative -- sessions, custom-tool events, deployment differences.
+6. Read **08** before going to production -- caching can cut your API bill by 90%.
+7. Read **09** if building multi-agent systems or integrating with MCP-compatible tools.
 
 ### For Knowledge Validation
 
@@ -234,6 +240,7 @@ These ground abstract concepts in the actual application.
 - **08**: Caching rules, cost calculation formulas, optimization checklist
 - **09**: MCP protocol specification, A2A protocol, tool vs agent distinction
 - **10**: SDK architecture, query() parameters, structured output flow, error handling, testing patterns
+- **11**: Managed Agents runtime, custom-tool events, session reuse, side-by-side SDK comparison
 
 ---
 
