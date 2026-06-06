@@ -135,15 +135,42 @@ async def _get_or_create_session(
 
 
 async def _list_event_ids(client: AsyncAnthropic, session_id: str) -> set[str]:
+    """Snapshot existing event IDs, answering orphaned tool calls first.
+
+    An interrupted run can leave an `agent.custom_tool_use` without its
+    `user.custom_tool_result`, which blocks the session forever. Answer any
+    such orphan with an error result so the reused session can make progress.
+    """
     seen: set[str] = set()
+    tool_use_ids: set[str] = set()
+    answered_ids: set[str] = set()
     async for event in client.beta.sessions.events.list(
         session_id,
         order="asc",
         limit=100,
     ):
         event_id = getattr(event, "id", None)
-        if event_id:
-            seen.add(event_id)
+        if not event_id:
+            continue
+        seen.add(event_id)
+        event_type = getattr(event, "type", "")
+        if event_type == "agent.custom_tool_use":
+            tool_use_ids.add(event_id)
+        elif event_type == "user.custom_tool_result":
+            answered_ids.add(getattr(event, "custom_tool_use_id", ""))
+
+    for orphan_id in tool_use_ids - answered_ids:
+        logger.warning(
+            "Answering orphaned tool call %s in session %s", orphan_id, session_id
+        )
+        await _send_tool_result(
+            client,
+            session_id,
+            orphan_id,
+            "Orphaned tool call from an interrupted run; ignore it and use "
+            "the latest patient message.",
+            is_error=True,
+        )
     return seen
 
 

@@ -98,7 +98,7 @@ sequenceDiagram
 | `ToolCallStep` | Individual tool call status (pending/running/done) |
 | `BriefingView` | Display AI-generated briefing with flags |
 | `FlagCard` | Visual component for each flag (color-coded by severity) |
-| `api.ts` | Centralized API client with SSE support |
+| `api.ts` | Centralized API client (sync briefing endpoints; SSE is V2+) |
 
 ### Backend (FastAPI + Python 3.12)
 
@@ -214,7 +214,7 @@ All agent interactions traced via hooks.
 └─────────────────────────────────────────┘
 ```
 
-### State 2: Generating (show tool calls live)
+### State 2: Generating (V2+ vision — V1 shows a spinner instead of live tool calls)
 ```
 ┌─────────────────────────────────────────┐
 │  John Smith, 67M                        │
@@ -264,9 +264,15 @@ All agent interactions traced via hooks.
 
 ---
 
-## SSE Event Stream Format
+## SSE Event Stream Format (V2+ — not implemented)
 
-Backend streams tool call progress via Server-Sent Events:
+> [!NOTE]
+> **V1 ships a synchronous API.** `POST /api/v1/patients/{id}/briefing` returns a complete
+> `BriefingResponse` JSON body (see `backend/src/routers/briefings.py`); the frontend shows a
+> loading state while waiting (Key Design Decision 5). The SSE format below is the V2+ vision
+> for streaming tool-call progress and does not change the sync endpoint's behavior.
+
+In V2+, the backend would stream tool call progress via Server-Sent Events:
 
 ```
 event: tool_start
@@ -294,6 +300,10 @@ data: {"briefing": {...full PatientBriefing object...}}
 ---
 
 ## Implementation Plan
+
+> [!NOTE]
+> Historical planning artifact. Where steps below mention SSE streaming or live tool-call
+> animation, V1 shipped the synchronous endpoint instead (see Key Design Decision 5).
 
 ### Implementation Decisions
 

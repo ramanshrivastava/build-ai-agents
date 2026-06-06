@@ -20,7 +20,7 @@
 
 | Wrong | Right |
 |-------|-------|
-| `from anthropic import ...` | `from claude_agent_sdk import ...` |
+| `from anthropic import ...` | `from claude_agent_sdk import ...` (exception: Managed Agents beta APIs — `managed_briefing_service.py`, `scripts/setup_managed_agent.py` — require the `anthropic` client) |
 | `Model.parse_obj(data)` | `Model.model_validate(data)` |
 | Call real LLM in tests | Mock agent responses |
 | Hardcode API keys | Use environment variables |

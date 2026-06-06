@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import datetime
+from collections.abc import AsyncIterator
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -66,21 +68,21 @@ VALID_JSON = {
 
 
 class _AsyncEvents:
-    def __init__(self, *batches):
+    def __init__(self, *batches: list[SimpleNamespace]) -> None:
         self.batches = list(batches)
         self.send = AsyncMock(return_value=SimpleNamespace())
 
-    def list(self, *_args, **_kwargs):
+    def list(self, *_args: Any, **_kwargs: Any) -> AsyncIterator[SimpleNamespace]:
         batch = self.batches.pop(0) if self.batches else []
 
-        async def _iter():
+        async def _iter() -> AsyncIterator[SimpleNamespace]:
             for event in batch:
                 yield event
 
         return _iter()
 
 
-def _client_with_events(events: _AsyncEvents):
+def _client_with_events(events: _AsyncEvents) -> SimpleNamespace:
     return SimpleNamespace(
         beta=SimpleNamespace(
             sessions=SimpleNamespace(
@@ -166,6 +168,37 @@ async def test_wait_handles_custom_tool_and_returns_json(monkeypatch):
     sent = client.beta.sessions.events.send.await_args.kwargs["events"][0]
     assert sent["type"] == "user.custom_tool_result"
     assert sent["custom_tool_use_id"] == "tool_1"
+
+
+async def test_list_event_ids_answers_orphaned_tool_calls():
+    orphan = SimpleNamespace(
+        id="tool_orphan",
+        type="agent.custom_tool_use",
+        name="search_clinical_guidelines",
+        input={"query": "diabetes"},
+    )
+    answered_use = SimpleNamespace(
+        id="tool_done",
+        type="agent.custom_tool_use",
+        name="search_clinical_guidelines",
+        input={"query": "hba1c"},
+    )
+    answered_result = SimpleNamespace(
+        id="res_1",
+        type="user.custom_tool_result",
+        custom_tool_use_id="tool_done",
+    )
+    events = _AsyncEvents([orphan, answered_use, answered_result])
+    client = _client_with_events(events)
+
+    seen = await svc._list_event_ids(client, "sess_123")
+
+    assert seen == {"tool_orphan", "tool_done", "res_1"}
+    assert client.beta.sessions.events.send.await_count == 1
+    sent = client.beta.sessions.events.send.await_args.kwargs["events"][0]
+    assert sent["type"] == "user.custom_tool_result"
+    assert sent["custom_tool_use_id"] == "tool_orphan"
+    assert sent["is_error"] is True
 
 
 async def test_generate_validates_final_schema(

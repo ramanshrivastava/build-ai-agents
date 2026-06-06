@@ -78,7 +78,7 @@ cd backend && uv run ruff check . --fix
 - V1: all flags have `source: "ai"` (no rule-based flags)
 - Use `from __future__ import annotations` for forward refs
 - Use Pydantic v2 patterns (`model_validate`, not `parse_obj`)
-- Import from `claude_agent_sdk`, never from `anthropic` directly
+- Import from `claude_agent_sdk` for agent work; the `anthropic` client is allowed only for Managed Agents beta APIs (`services/managed_briefing_service.py`, `scripts/setup_managed_agent.py`)
 - No Langfuse observability in V1
 
 ## Claude Agent SDK Gotchas

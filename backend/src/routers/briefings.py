@@ -82,7 +82,7 @@ async def create_managed_briefing(
         raise HTTPException(
             status_code=status_code,
             detail=ErrorDetail(code=e.code, message=e.message).model_dump(),
-        )
+        ) from e
 
 
 @router.delete("/{patient_id}/briefing/managed/session", status_code=204)
