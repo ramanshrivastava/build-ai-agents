@@ -63,6 +63,8 @@ export interface PatientBriefing {
   generated_at: string;
 }
 
+export type BriefingRuntime = 'sdk' | 'managed';
+
 export interface ApiErrorDetail {
   code: string;
   message: string;

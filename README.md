@@ -37,27 +37,40 @@ This repo is a structured learning path from transformer basics to autonomous co
 | [`docs/agent-arch/07-TOOL-USE-AND-AGENTIC-LOOP.md`](docs/agent-arch/07-TOOL-USE-AND-AGENTIC-LOOP.md) | Tool calling, agentic loops, orchestration |
 | [`docs/agent-arch/08-PROMPT-CACHING-AND-OPTIMIZATION.md`](docs/agent-arch/08-PROMPT-CACHING-AND-OPTIMIZATION.md) | Caching, batching, cost optimization |
 | [`docs/agent-arch/09-MCP-AND-A2A-PROTOCOLS.md`](docs/agent-arch/09-MCP-AND-A2A-PROTOCOLS.md) | MCP servers/clients, A2A protocol |
-| [`backend/src/services/briefing_service.py`](backend/src/services/briefing_service.py) | **Live code** — real agent with structured output |
 | [`docs/SCOPE-V1.md`](docs/SCOPE-V1.md) | How the agentic workflow was planned and built |
 
-### Module 4: Full Agents (Human-in-the-Loop)
+### Module 4: Autonomous Agents
 
-> Agent has full control + human oversight + hooks for safety.
+> The agent owns the loop. Two ways to build the same agent — own the harness yourself, or rent a managed runtime.
+
+**4.1 — Build the harness yourself (Claude Agent SDK)**
 
 | Resource | What You'll Learn |
 |----------|-------------------|
-| [`backend/src/`](backend/src/) | **Live code** — the doctor assistant agent |
-| `docs/agent-arch/08-FULL-AGENTS-HITL.md` | *Coming soon* — agent autonomy, HITL patterns, hooks |
+| [`docs/agent-arch/10-CLAUDE-AGENT-SDK.md`](docs/agent-arch/10-CLAUDE-AGENT-SDK.md) | SDK architecture, `query()` internals, structured output, error handling, testing |
+| [`backend/src/services/briefing_service.py`](backend/src/services/briefing_service.py) | **Live code** — real agent with structured output |
+| [`backend/src/`](backend/src/) | **Live code** — the full doctor assistant agent |
+
+**4.2 — Use a managed runtime (Claude Managed Agents)**
+
+| Resource | What You'll Learn |
+|----------|-------------------|
+| [`docs/agent-arch/11-CLAUDE-MANAGED-AGENTS.md`](docs/agent-arch/11-CLAUDE-MANAGED-AGENTS.md) | Custom-tool events, session reuse, the inversion of control, what people miss |
+| [`backend/src/services/managed_briefing_service.py`](backend/src/services/managed_briefing_service.py) | **Live code** — same briefing shape via Claude Managed Agents custom-tool events |
+
+| Resource | What You'll Learn |
+|----------|-------------------|
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System architecture vision (V1 → V2+) |
 
-### Module 5: Full Agents (Skills + Sandboxes)
+### Module 5: Autonomous Agent Patterns (HITL, Skills, Sandboxes)
 
-> The next 3-6 months of agent evolution.
+> How to run autonomous agents safely — human oversight, hooks, skill systems, sandboxed execution.
 
 | Resource | What You'll Learn |
 |----------|-------------------|
 | [`.claude/skills/`](.claude/skills/) | **Live examples** — custom Claude Code skills |
-| `docs/agent-arch/09-SKILLS-AND-SANDBOXES.md` | *Coming soon* — skill systems, sandboxed execution |
+| `docs/agent-arch/12-HITL-PATTERNS.md` | *Coming soon* — agent autonomy, HITL patterns, hooks |
+| `docs/agent-arch/13-SKILLS-AND-SANDBOXES.md` | *Coming soon* — skill systems, sandboxed execution |
 
 ### Module 6: Coding Agents
 
@@ -69,7 +82,7 @@ This repo is a structured learning path from transformer basics to autonomous co
 | [`.claude/settings.json`](.claude/settings.json) | Hooks, permissions, environment |
 | [`docs/PLAN-ITERATION-3.md`](docs/PLAN-ITERATION-3.md) | AI-first dev environment setup |
 | [`docs/PLAN-ITERATION-1.md`](docs/PLAN-ITERATION-1.md) → [`2.md`](docs/PLAN-ITERATION-2.md) → [`3.md`](docs/PLAN-ITERATION-3.md) | How planning evolves across iterations |
-| `docs/agent-arch/10-CODING-AGENTS.md` | *Coming soon* — agents.md, tools, repo patterns |
+| `docs/agent-arch/14-CODING-AGENTS.md` | *Coming soon* — agents.md, tools, repo patterns |
 
 ### Module 7: Personal Agents
 
@@ -78,7 +91,7 @@ This repo is a structured learning path from transformer basics to autonomous co
 | Resource | What You'll Learn |
 |----------|-------------------|
 | [`zsh-ai-complete/`](zsh-ai-complete/) | **Live tool** — AI-powered zsh command completion with Claude CLI |
-| `docs/agent-arch/11-PERSONAL-AGENTS.md` | *Coming soon* — personal automation agents, setup agents |
+| `docs/agent-arch/15-PERSONAL-AGENTS.md` | *Coming soon* — personal automation agents, setup agents |
 
 ### Module 8: Agent Operations
 
@@ -130,6 +143,7 @@ This repo is a structured learning path from transformer basics to autonomous co
 - Node.js 20+ and npm
 - Docker (for PostgreSQL)
 - A Claude API key from [console.anthropic.com](https://console.anthropic.com)
+- Claude Managed Agents beta access if you want to run the managed-agent path
 
 ### Backend
 
@@ -139,6 +153,14 @@ cp .env.example .env           # Add your ANTHROPIC_API_KEY
 uv sync                        # Install dependencies
 docker compose up -d           # Start PostgreSQL
 uv run uvicorn src.main:app --reload  # Start server at localhost:8000
+```
+
+Optional managed-agent setup:
+
+```bash
+cd backend
+uv run python ../scripts/setup_managed_agent.py
+# Add the printed MANAGED_AGENT_ID and MANAGED_ENVIRONMENT_ID to .env
 ```
 
 ### Frontend

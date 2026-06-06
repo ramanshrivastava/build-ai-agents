@@ -19,6 +19,11 @@ test_session_factory = async_sessionmaker(
 )
 
 
+@pytest.fixture
+def session_factory() -> async_sessionmaker[AsyncSession]:
+    return test_session_factory
+
+
 async def override_get_session() -> AsyncIterator[AsyncSession]:
     async with test_session_factory() as session:
         yield session

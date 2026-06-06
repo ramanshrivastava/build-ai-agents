@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { m } from "motion/react";
 import { Group, Panel, Separator } from "react-resizable-panels";
@@ -11,6 +11,7 @@ import { BriefingView } from "@/components/briefing/BriefingView";
 import { usePatient } from "@/hooks/usePatients";
 import { useBriefing } from "@/hooks/useBriefing";
 import { Skeleton } from "@/components/ui/skeleton";
+import type { BriefingRuntime } from "@/types";
 
 export function PatientsPage() {
   const { id } = useParams<{ id: string }>();
@@ -19,15 +20,30 @@ export function PatientsPage() {
 
   const { data: patient, isLoading: isLoadingPatient } = usePatient(patientId);
   const briefing = useBriefing();
+  const [briefingRuntime, setBriefingRuntime] = useState<BriefingRuntime>("sdk");
+  const [pendingRuntime, setPendingRuntime] = useState<BriefingRuntime | null>(null);
 
   // Clear briefing when switching patients
   useEffect(() => {
     briefing.reset();
+    setBriefingRuntime("sdk");
+    setPendingRuntime(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patientId]);
 
   const handleSelectPatient = (selectedId: number) => {
     navigate(`/patients/${selectedId}`);
+  };
+
+  const handleGenerate = (runtime: BriefingRuntime) => {
+    if (!patient) return;
+    setPendingRuntime(runtime);
+    briefing.mutate(
+      { patientId: patient.id, runtime },
+      {
+        onSuccess: () => setBriefingRuntime(runtime),
+      },
+    );
   };
 
   const sidebar = (
@@ -74,7 +90,8 @@ export function PatientsPage() {
               <BriefingView
                 key={patientId}
                 briefing={briefing.data}
-                onRegenerate={() => briefing.mutate(patient.id)}
+                runtime={briefingRuntime}
+                onRegenerate={() => handleGenerate(briefingRuntime)}
                 isRegenerating={briefing.isPending}
               />
             </m.div>
@@ -96,10 +113,14 @@ export function PatientsPage() {
     <MainArea sidebar={sidebar}>
       <div className="h-full overflow-y-auto">
         <GenerateButton
-          onGenerate={() => briefing.mutate(patient.id)}
+          onGenerate={handleGenerate}
           isLoading={briefing.isPending}
+          pendingRuntime={pendingRuntime}
           error={briefing.error}
-          onCancel={() => briefing.reset()}
+          onCancel={() => {
+            setPendingRuntime(null);
+            briefing.reset();
+          }}
         />
         <PatientDetails patient={patient} />
       </div>

@@ -20,12 +20,14 @@ flowchart TB
     subgraph Agent["AI Agent (Claude Agent SDK)"]
         BriefingAgent[Briefing Agent]
 
-        subgraph Tools["Deterministic Tools"]
-            LabTool[check_lab_thresholds]
-            DrugTool[check_drug_interactions]
-            ScreeningTool[check_overdue_screenings]
-            GuidelineTool[search_guidelines]
+        subgraph Tools["Agent Tools"]
+            GuidelineTool[search_clinical_guidelines]
         end
+    end
+
+    subgraph Managed["Optional Managed Runtime"]
+        ManagedSession[Claude Managed Agents Session]
+        ManagedTool[Custom Tool Events]
     end
 
     subgraph Observability["Observability"]
@@ -41,17 +43,17 @@ flowchart TB
     PatientService --> DB
 
     BriefingService -->|patient record| BriefingAgent
-    BriefingAgent -->|calls| LabTool
-    BriefingAgent -->|calls| DrugTool
-    BriefingAgent -->|calls| ScreeningTool
     BriefingAgent -->|calls| GuidelineTool
     BriefingAgent -->|structured output| BriefingService
+    BriefingService -->|optional /briefing/managed| ManagedSession
+    ManagedSession -->|agent.custom_tool_use| ManagedTool
+    ManagedTool --> GuidelineTool
 
     BriefingAgent -.->|traces| Langfuse
     Tools -.->|traces| Langfuse
 ```
 
-## Data Flow: Generate Briefing (with SSE Streaming)
+## Data Flow: Generate Briefing
 
 ```mermaid
 sequenceDiagram
@@ -60,7 +62,7 @@ sequenceDiagram
     participant PS as PatientService
     participant BS as BriefingService
     participant Agent as BriefingAgent
-    participant Tools as Deterministic Tools
+    participant Tools as Guideline Search Tool
     participant LF as Langfuse
 
     FE->>API: POST /api/v1/patients/{id}/briefing
@@ -72,27 +74,15 @@ sequenceDiagram
 
     Note over Agent: Agent reasons about patient
 
-    Agent->>Tools: check_lab_thresholds(labs)
-    BS-->>FE: SSE: tool_start (check_lab_thresholds)
-    Tools-->>Agent: Lab flags (deterministic)
-    BS-->>FE: SSE: tool_complete (2 flags found)
-
-    Agent->>Tools: check_drug_interactions(meds)
-    BS-->>FE: SSE: tool_start (check_drug_interactions)
-    Tools-->>Agent: Interaction warnings
-    BS-->>FE: SSE: tool_complete (0 interactions)
-
-    Agent->>Tools: check_overdue_screenings(patient)
-    BS-->>FE: SSE: tool_start (check_overdue_screenings)
-    Tools-->>Agent: Overdue items
-    BS-->>FE: SSE: tool_complete (1 overdue)
+    Agent->>Tools: search_clinical_guidelines(query)
+    Tools-->>Agent: Retrieved guideline chunks with source IDs
 
     Note over Agent: Agent synthesizes briefing
 
     Agent-->>BS: Structured PatientBriefing
 
     BS->>LF: Log trace + tool calls
-    BS-->>FE: SSE: complete (full briefing)
+    BS-->>FE: JSON BriefingResponse
 ```
 
 ## Component Details
@@ -118,17 +108,15 @@ sequenceDiagram
 | `routers/briefings.py` | Briefing generation endpoint |
 | `services/patient_service.py` | Patient data access |
 | `services/briefing_service.py` | Orchestrates agent calls |
+| `services/managed_briefing_service.py` | Optional Claude Managed Agents runtime path |
 | `agents/briefing_agent.py` | Claude Agent SDK configuration |
-| `agents/tools.py` | Deterministic tool definitions |
+| `agents/tools.py` | Clinical guideline search tool definition |
 
 ### AI Agent Tools
 
 | Tool | Input | Output | Logic |
 |------|-------|--------|-------|
-| `check_lab_thresholds` | Lab results array | Flags for out-of-range | Threshold lookup table |
-| `check_drug_interactions` | Medications array | Interaction warnings | Drug interaction DB |
-| `check_overdue_screenings` | Patient record | Overdue items | Age + date rules |
-| `search_guidelines` | Condition name | Relevant guidelines | Static guidelines DB |
+| `search_clinical_guidelines` | Query, optional specialty, max results | XML-formatted guideline chunks with source IDs | Embeds query, searches Qdrant, formats citations |
 
 ### Structured Output Schema
 
@@ -140,7 +128,7 @@ sequenceDiagram
       "severity": "critical|warning|info",
       "title": "string",
       "description": "string",
-      "source": "tool:check_lab_thresholds|tool:check_drug_interactions|ai",
+      "source": "ai",
       "suggested_action": "string"
     }
   ],
@@ -161,13 +149,13 @@ sequenceDiagram
 
 ## Key Design Decisions
 
-### 1. Agent-with-Tools Pattern (not Rules-First)
+### 1. Agent-with-Tools Pattern
 
-**Decision:** Give agent full patient record and let it call deterministic tools as needed.
+**Decision:** Give agent full patient record and let it call the clinical guideline search tool as needed.
 
 **Rationale:**
 - Agent can reason about *what* to check based on patient context
-- Tools remain deterministic and testable
+- Tool implementation remains testable
 - More flexible than rigid rules-first pipeline
 - AI can spot patterns rules might miss
 
@@ -175,10 +163,7 @@ sequenceDiagram
 
 ### 2. Source Tagging
 
-Every flag includes `source` field:
-- `tool:check_lab_thresholds` - from deterministic tool
-- `tool:check_drug_interactions` - from deterministic tool
-- `ai` - agent's own insight
+Every flag currently uses `source: "ai"`. Citations in descriptions point to retrieved guideline source IDs such as `[1]`.
 
 **Rationale:** Auditability for healthcare compliance.
 
@@ -207,7 +192,7 @@ All agent interactions traced via hooks.
 **Rationale:**
 - Avoids unnecessary API calls (cost + latency)
 - User controls when to trigger AI generation
-- Enables showing live progress with tool call animation
+- Keeps the sync API simple while the frontend shows a loading state
 
 ---
 
