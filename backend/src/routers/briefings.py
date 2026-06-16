@@ -13,6 +13,7 @@ from src.services.managed_briefing_service import (
     generate_managed_briefing,
     reset_managed_session,
 )
+from src.agents.briefing_agent import generate_briefing_via_http_mcp
 from src.services.briefing_service import BriefingGenerationError, generate_briefing
 from src.services.patient_service import get_patient_by_id
 
@@ -48,6 +49,39 @@ async def create_briefing(
                 message=e.message,
             ).model_dump(),
         )
+
+
+@router.post("/{patient_id}/briefing/external-mcp", response_model=BriefingResponse)
+async def create_external_mcp_briefing(
+    patient_id: int,
+    session: AsyncSession = Depends(get_session),
+) -> BriefingResponse:
+    """Generate a briefing where the search tool is served by an external HTTP MCP server.
+
+    Requires the standalone FastMCP server (`mcp_server/server.py`) to be running at
+    EXTERNAL_MCP_URL. The agent reaches the tool over Streamable HTTP rather than in-process.
+    """
+    patient = await get_patient_by_id(session, patient_id)
+    if patient is None:
+        raise HTTPException(
+            status_code=404,
+            detail=ErrorDetail(
+                code="PATIENT_NOT_FOUND",
+                message=f"Patient with ID {patient_id} not found",
+            ).model_dump(),
+        )
+
+    logger.info("Generating external-MCP briefing for patient %d", patient_id)
+    try:
+        return await generate_briefing_via_http_mcp(patient)
+    except BriefingGenerationError as e:
+        logger.exception(
+            "External-MCP briefing generation failed for patient %d", patient_id
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=ErrorDetail(code=e.code, message=e.message).model_dump(),
+        ) from e
 
 
 @router.post("/{patient_id}/briefing/managed", response_model=BriefingResponse)

@@ -36,5 +36,15 @@ class Settings(BaseSettings):
     embedding_model: str = "text-embedding-005"
     embedding_dimensions: int = 768
 
+    # External HTTP MCP server (third tool path; FastMCP over Streamable HTTP)
+    # mcp_server_* configure the standalone server process (mcp_server/server.py);
+    # external_mcp_url is where the agent connects to reach it.
+    mcp_server_host: str = "127.0.0.1"
+    mcp_server_port: int = 9000
+    # Canonical FastMCP Streamable HTTP path is /mcp (no trailing slash); a
+    # trailing slash 307-redirects, which the SDK's MCP client does not follow.
+    external_mcp_url: str = "http://127.0.0.1:9000/mcp"
+    external_mcp_auth_token: str = ""  # optional; sent as Authorization: Bearer ...
+
 
 settings = Settings()

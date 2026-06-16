@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.models.orm import Patient
-from src.agents.briefing_agent import generate_briefing
+from src.agents.briefing_agent import (
+    generate_briefing,
+    generate_briefing_via_http_mcp,
+)
 from src.services.briefing_service import BriefingGenerationError
 
 # --- Fixtures ---
@@ -142,6 +145,37 @@ async def test_generate_briefing_uses_mcp_server(mock_query, fake_patient):
     assert options.max_turns == 4
     assert "briefing" in options.mcp_servers
     assert "mcp__briefing__search_clinical_guidelines" in options.allowed_tools
+
+
+@patch("src.agents.briefing_agent.query")
+async def test_http_mcp_briefing_uses_external_server(mock_query, fake_patient):
+    """The HTTP-MCP path configures an external Streamable HTTP server, same tool/turns."""
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    result = await generate_briefing_via_http_mcp(fake_patient)
+
+    assert len(result.flags) == 2
+    options = mock_query.call_args.kwargs["options"]
+    assert options.max_turns == 4
+    assert options.mcp_servers["briefing"]["type"] == "http"
+    assert options.mcp_servers["briefing"]["url"].endswith("/mcp")
+    assert "mcp__briefing__search_clinical_guidelines" in options.allowed_tools
+
+
+@patch("src.agents.briefing_agent.query")
+async def test_http_mcp_briefing_adds_auth_header_when_token_set(
+    mock_query, fake_patient, monkeypatch
+):
+    """A configured token is forwarded as an Authorization: Bearer header."""
+    monkeypatch.setattr("src.config.settings.external_mcp_auth_token", "secret-123")
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    await generate_briefing_via_http_mcp(fake_patient)
+
+    headers = mock_query.call_args.kwargs["options"].mcp_servers["briefing"]["headers"]
+    assert headers["Authorization"] == "Bearer secret-123"
 
 
 @patch("src.agents.briefing_agent.query")

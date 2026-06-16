@@ -185,14 +185,16 @@ async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
     yield {"type": "user", "message": {"role": "user", "content": text}}
 
 
-async def generate_briefing(patient: Patient) -> BriefingResponse:
-    """Generate a RAG-augmented patient briefing using the multi-turn agent."""
-    patient_json = _serialize_patient(patient)
+def _build_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
+    """Build the agent options shared by every tool path.
 
-    options = ClaudeAgentOptions(
+    Only the `mcp_servers` value differs between the in-process and external-HTTP
+    paths; the tool name, system prompt, output schema, and turn budget are identical.
+    """
+    return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
         model=settings.ai_model,
-        mcp_servers={"briefing": briefing_tools},
+        mcp_servers=mcp_servers,
         allowed_tools=["mcp__briefing__search_clinical_guidelines"],
         output_format={
             "type": "json_schema",
@@ -202,8 +204,49 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
         permission_mode="bypassPermissions",
     )
 
+
+def _http_mcp_servers() -> dict[str, Any]:
+    """Build the external HTTP MCP server config for the FastMCP server.
+
+    Adds a bearer token header only when one is configured, matching the
+    optional auth on the standalone server (`mcp_server/server.py`).
+    """
+    config: dict[str, Any] = {"type": "http", "url": settings.external_mcp_url}
+    if settings.external_mcp_auth_token:
+        config["headers"] = {
+            "Authorization": f"Bearer {settings.external_mcp_auth_token}"
+        }
+    return {"briefing": config}
+
+
+async def generate_briefing(patient: Patient) -> BriefingResponse:
+    """Generate a RAG-augmented briefing using in-process SDK MCP tools."""
+    options = _build_options({"briefing": briefing_tools})
+    return await _run_briefing(patient, options, label="RAG agent (in-process MCP)")
+
+
+async def generate_briefing_via_http_mcp(patient: Patient) -> BriefingResponse:
+    """Generate a briefing where the search tool is served by an external HTTP MCP server.
+
+    The tool runs in the standalone FastMCP server (`mcp_server/server.py`) reached over
+    Streamable HTTP, rather than in-process. Identical behavior otherwise.
+    """
+    options = _build_options(_http_mcp_servers())
+    return await _run_briefing(patient, options, label="HTTP MCP agent")
+
+
+async def _run_briefing(
+    patient: Patient,
+    options: ClaudeAgentOptions,
+    *,
+    label: str,
+) -> BriefingResponse:
+    """Run the multi-turn agent loop for the given options and return the briefing."""
+    patient_json = _serialize_patient(patient)
+
     logger.info(
-        "Starting RAG agent: model=%s max_turns=%d tools=%s",
+        "Starting %s: model=%s max_turns=%d tools=%s",
+        label,
         settings.ai_model,
         4,
         options.allowed_tools,
@@ -293,7 +336,8 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
 
     if result is not None:
         logger.info(
-            "RAG briefing complete: %d flags, %d actions",
+            "%s complete: %d flags, %d actions",
+            label,
             len(result.flags),
             len(result.suggested_actions),
         )
