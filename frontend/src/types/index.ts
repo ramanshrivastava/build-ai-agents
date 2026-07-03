@@ -61,9 +61,49 @@ export interface PatientBriefing {
   summary: BriefingSummary;
   suggested_actions: SuggestedAction[];
   generated_at: string;
+  /** Persisted briefing id (present when the backend stored it). */
+  id?: number | null;
 }
 
 export type BriefingRuntime = 'sdk' | 'managed';
+
+// --- Unified patient chat (SSE) ---
+
+export type ChatRole = 'user' | 'assistant';
+
+/** One rendered bubble in the chat thread. */
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  status?: 'streaming' | 'done' | 'error';
+  /** Live tool activity shown under the bubble (e.g. "Searching guidelines…"). */
+  activity?: string | null;
+}
+
+/**
+ * Discriminated union mirroring the backend's SSE event vocabulary
+ * (see backend/src/routers/chat.py): one variant per `event:` name.
+ */
+export type ChatEvent =
+  | { kind: 'text'; text: string }
+  | { kind: 'tool_use'; tool: string; input: Record<string, unknown> }
+  | { kind: 'tool_result' }
+  | { kind: 'briefing_published'; briefing: PatientBriefing }
+  | { kind: 'done'; session_id: string | null }
+  | { kind: 'error'; code: string; message: string };
+
+export interface ChatHistoryMessage {
+  role: ChatRole;
+  content: string;
+  created_at: string;
+}
+
+export interface ChatHistoryResponse {
+  conversation_id: number | null;
+  messages: ChatHistoryMessage[];
+  latest_briefing: PatientBriefing | null;
+}
 
 export interface ApiErrorDetail {
   code: string;

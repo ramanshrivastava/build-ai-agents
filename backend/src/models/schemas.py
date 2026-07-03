@@ -61,7 +61,54 @@ class PatientBriefing(BaseModel):
 
 
 class BriefingResponse(PatientBriefing):
+    # Persisted briefing id, used to open a follow-up conversation. None when the
+    # briefing was not stored (e.g. endpoints that don't persist).
+    id: int | None = None
     generated_at: datetime.datetime
+
+
+# --- Follow-up chat (conversational) ---
+
+
+class BriefingChatRequest(BaseModel):
+    question: str
+
+
+class BriefingChatMessage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+    content: str
+    created_at: datetime.datetime
+
+
+class BriefingChatResponse(BaseModel):
+    briefing_id: int
+    answer: str
+    history: list[BriefingChatMessage]
+
+
+# --- Unified patient chat (SSE) ---
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+    content: str
+    created_at: datetime.datetime
+
+
+class ChatHistoryResponse(BaseModel):
+    """Everything the UI needs to rehydrate a patient's chat after a refresh."""
+
+    conversation_id: int | None
+    messages: list[ChatMessageOut]
+    latest_briefing: BriefingResponse | None
 
 
 # --- Error schema ---

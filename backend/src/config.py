@@ -12,6 +12,13 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     ai_model: str = "claude-opus-4-6"
+    # Optional: route the SDK briefing agent through a translation proxy (e.g.
+    # LiteLLM pointing at Vertex Gemini). When set, ai_model is the model NAME
+    # the proxy expects (e.g. gemini-2.5-pro), not a real Claude id. Only the
+    # in-process and HTTP-MCP SDK paths follow this; the Managed Agents path
+    # stays on Anthropic (it is server-hosted and cannot be re-pointed).
+    anthropic_base_url: str = ""
+    anthropic_auth_token: str = ""
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/build_ai_agents"
     debug: bool = False
 
