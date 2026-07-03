@@ -14,7 +14,10 @@ from claude_agent_sdk import (
     ResultMessage,
     SystemMessage,
     TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
     ToolUseBlock,
+    UserMessage,
 )
 from sqlalchemy import select
 
@@ -31,7 +34,9 @@ from tests.test_briefing_agent import VALID_STRUCTURED_OUTPUT
 # --- Helpers ---
 
 
-def _result(session_id: str = "s-1", *, is_error: bool = False, result: str | None = None):
+def _result(
+    session_id: str = "s-1", *, is_error: bool = False, result: str | None = None
+):
     return ResultMessage(
         subtype="success" if not is_error else "error",
         duration_ms=1000,
@@ -73,12 +78,13 @@ class FakeClient:
 
 
 @patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
-async def test_drive_chat_turn_events_and_session():
-    """SDK messages map to SSE events in order; session_id is captured."""
+async def test_drive_chat_turn_events_session_and_trace():
+    """SDK messages map to SSE events in order; session_id and trace captured."""
     FakeClient.messages = [
         SystemMessage(subtype="init", data={"session_id": "s-init"}),
         AssistantMessage(
             content=[
+                ThinkingBlock(thinking="Reviewing labs.", signature="sig"),
                 TextBlock(text="Let me check."),
                 ToolUseBlock(
                     id="t1",
@@ -88,28 +94,49 @@ async def test_drive_chat_turn_events_and_session():
             ],
             model="test-model",
         ),
+        UserMessage(
+            content=[
+                ToolResultBlock(
+                    tool_use_id="t1",
+                    content=[{"type": "text", "text": "guideline excerpt"}],
+                    is_error=False,
+                )
+            ]
+        ),
         AssistantMessage(content=[TextBlock(text="All done.")], model="test-model"),
         _result("s-init"),
     ]
     queue: asyncio.Queue = asyncio.Queue()
-    options = build_chat_options(queue, patient_id=1, resume_session_id=None, patient_json="{}")
+    options = build_chat_options(
+        queue, patient_id=1, resume_session_id=None, patient_json="{}"
+    )
 
-    session_id, text = await drive_chat_turn("hello", options, queue)
+    session_id, text, trace = await drive_chat_turn("hello", options, queue)
 
     assert session_id == "s-init"
     assert text == "Let me check.All done."
     events = [queue.get_nowait() for _ in range(queue.qsize())]
     assert events == [
+        ("thinking", {"text": "Reviewing labs."}),
         ("text", {"text": "Let me check."}),
         (
             "tool_use",
             {
+                "id": "t1",
                 "tool": "search_clinical_guidelines",
                 "input": {"query": "metformin renal dosing"},
             },
         ),
+        (
+            "tool_result",
+            {"tool_use_id": "t1", "is_error": False, "content": "guideline excerpt"},
+        ),
         ("text", {"text": "All done."}),
     ]
+    # The persisted trace interleaves parts in order, with the tool result
+    # attached to its originating call.
+    assert [p["type"] for p in trace] == ["thinking", "text", "tool_use", "text"]
+    assert trace[2]["result"] == {"is_error": False, "content": "guideline excerpt"}
 
 
 @patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
@@ -134,7 +161,9 @@ async def test_publish_briefing_input_suppressed():
     await drive_chat_turn("/briefing", options, queue)
 
     events = [queue.get_nowait() for _ in range(queue.qsize())]
-    assert events == [("tool_use", {"tool": "publish_briefing", "input": {}})]
+    assert events == [
+        ("tool_use", {"id": "t1", "tool": "publish_briefing", "input": {}})
+    ]
 
 
 @patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
@@ -204,7 +233,9 @@ async def db_patient(session_factory) -> Patient:
         return patient
 
 
-async def test_publish_tool_persists_and_queues(monkeypatch, session_factory, db_patient):
+async def test_publish_tool_persists_and_queues(
+    monkeypatch, session_factory, db_patient
+):
     monkeypatch.setattr("src.database.async_session", session_factory)
     queue: asyncio.Queue = asyncio.Queue()
     publish = make_publish_tool(queue, db_patient.id)

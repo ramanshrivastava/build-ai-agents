@@ -71,14 +71,35 @@ export type BriefingRuntime = 'sdk' | 'managed';
 
 export type ChatRole = 'user' | 'assistant';
 
+export interface ToolResult {
+  is_error: boolean;
+  content: string;
+}
+
+/**
+ * One part of an assistant turn, in the order the agent produced it.
+ * Mirrors the backend's persisted `trace` items, plus a client-only
+ * `streaming` flag on thinking parts (caret while tokens arrive).
+ */
+export type TracePart =
+  | { type: 'thinking'; text: string; streaming?: boolean }
+  | { type: 'text'; text: string }
+  | {
+      type: 'tool_use';
+      id: string;
+      tool: string;
+      input: Record<string, unknown>;
+      result?: ToolResult | null;
+    };
+
 /** One rendered bubble in the chat thread. */
 export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
   status?: 'streaming' | 'done' | 'error';
-  /** Live tool activity shown under the bubble (e.g. "Searching guidelines…"). */
-  activity?: string | null;
+  /** Ordered agent trace for assistant turns (thinking, tool calls, text). */
+  parts?: TracePart[];
 }
 
 /**
@@ -86,9 +107,10 @@ export interface ChatMessage {
  * (see backend/src/routers/chat.py): one variant per `event:` name.
  */
 export type ChatEvent =
+  | { kind: 'thinking'; text: string }
   | { kind: 'text'; text: string }
-  | { kind: 'tool_use'; tool: string; input: Record<string, unknown> }
-  | { kind: 'tool_result' }
+  | { kind: 'tool_use'; id: string; tool: string; input: Record<string, unknown> }
+  | { kind: 'tool_result'; tool_use_id: string; is_error: boolean; content: string }
   | { kind: 'briefing_published'; briefing: PatientBriefing }
   | { kind: 'done'; session_id: string | null }
   | { kind: 'error'; code: string; message: string };
@@ -96,6 +118,7 @@ export type ChatEvent =
 export interface ChatHistoryMessage {
   role: ChatRole;
   content: string;
+  trace: TracePart[] | null;
   created_at: string;
 }
 

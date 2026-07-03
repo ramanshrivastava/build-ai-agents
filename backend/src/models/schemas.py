@@ -100,6 +100,9 @@ class ChatMessageOut(BaseModel):
 
     role: str
     content: str
+    # Agent trace for assistant turns: ordered thinking / tool_use / text
+    # parts, exactly as they streamed. None for user messages.
+    trace: list[dict] | None = None
     created_at: datetime.datetime
 
 

@@ -117,4 +117,8 @@ class ConversationMessage(Base):
     )
     role: Mapped[str] = mapped_column(String(16))  # "user" | "assistant"
     content: Mapped[str] = mapped_column(Text)
+    # Ordered agent trace for assistant turns: thinking blocks, tool calls
+    # (with inputs + result previews), and text — exactly as they interleaved
+    # during the turn, so the UI can replay the agent's work after a refresh.
+    trace: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime.datetime] = mapped_column(server_default=func.now())

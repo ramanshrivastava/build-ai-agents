@@ -72,14 +72,27 @@ export function parseSSEChunk(
     const data = dataLines.length > 0 ? JSON.parse(dataLines.join("\n")) : {};
 
     switch (eventName) {
+      case "thinking":
+        events.push({ kind: "thinking", text: data.text });
+        break;
       case "text":
         events.push({ kind: "text", text: data.text });
         break;
       case "tool_use":
-        events.push({ kind: "tool_use", tool: data.tool, input: data.input });
+        events.push({
+          kind: "tool_use",
+          id: data.id,
+          tool: data.tool,
+          input: data.input,
+        });
         break;
       case "tool_result":
-        events.push({ kind: "tool_result" });
+        events.push({
+          kind: "tool_result",
+          tool_use_id: data.tool_use_id,
+          is_error: Boolean(data.is_error),
+          content: data.content ?? "",
+        });
         break;
       case "briefing_published":
         // The data payload IS the briefing (BriefingResponse shape).

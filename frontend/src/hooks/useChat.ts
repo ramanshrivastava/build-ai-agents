@@ -1,21 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/services/api";
-import type { ChatEvent, ChatMessage, PatientBriefing } from "@/types";
-
-/** Human-readable activity line for a tool_use event. */
-function activityLabel(tool: string): string {
-  switch (tool) {
-    case "search_clinical_guidelines":
-      return "Searching clinical guidelines…";
-    case "publish_briefing":
-      return "Publishing briefing…";
-    case "Skill":
-      return "Running briefing skill…";
-    default:
-      return `Running ${tool}…`;
-  }
-}
+import type { ChatEvent, ChatMessage, PatientBriefing, TracePart } from "@/types";
 
 /**
  * Chat state machine for one patient.
@@ -23,6 +9,10 @@ function activityLabel(tool: string): string {
  * Server state (persisted history + latest briefing) comes from react-query;
  * the in-flight turn lives in local state and is folded into `messages` until
  * the post-turn refetch takes over as the source of truth.
+ *
+ * Assistant turns are a list of ordered `parts` (thinking, tool calls, text)
+ * mirroring the backend's SSE events; the same shape comes back persisted as
+ * `trace` on history messages, so live and replayed turns render identically.
  */
 export function useChat(patientId: number | undefined) {
   const queryClient = useQueryClient();
@@ -51,6 +41,7 @@ export function useChat(patientId: number | undefined) {
       role: message.role,
       content: message.content,
       status: "done",
+      parts: message.trace ?? undefined,
     }),
   );
   const messages = [...historyMessages, ...liveMessages];
@@ -65,48 +56,86 @@ export function useChat(patientId: number | undefined) {
       setLiveMessages((prev) => [
         ...prev,
         { id: `live-${stamp}-user`, role: "user", content: text, status: "done" },
-        { id: assistantId, role: "assistant", content: "", status: "streaming" },
+        {
+          id: assistantId,
+          role: "assistant",
+          content: "",
+          status: "streaming",
+          parts: [],
+        },
       ]);
       setIsStreaming(true);
 
-      const patchAssistant = (patch: Partial<ChatMessage>) =>
+      // Every event mutates only the placeholder assistant message.
+      const patchAssistant = (fn: (message: ChatMessage) => ChatMessage) =>
         setLiveMessages((prev) =>
-          prev.map((m) => (m.id === assistantId ? { ...m, ...patch } : m)),
+          prev.map((m) => (m.id === assistantId ? fn(m) : m)),
         );
+
+      const appendPart = (part: TracePart) =>
+        patchAssistant((m) => ({
+          ...m,
+          // A new part means the previous thinking part finished streaming.
+          parts: [
+            ...(m.parts ?? []).map((p) =>
+              p.type === "thinking" ? { ...p, streaming: false } : p,
+            ),
+            part,
+          ],
+        }));
 
       const handleEvent = (event: ChatEvent) => {
         switch (event.kind) {
+          case "thinking":
+            appendPart({ type: "thinking", text: event.text, streaming: true });
+            break;
           case "text":
-            setLiveMessages((prev) =>
-              prev.map((m) =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: m.content ? `${m.content}\n\n${event.text}` : event.text,
-                      activity: null,
-                    }
-                  : m,
-              ),
-            );
+            appendPart({ type: "text", text: event.text });
+            patchAssistant((m) => ({
+              ...m,
+              content: m.content ? `${m.content}\n\n${event.text}` : event.text,
+            }));
             break;
           case "tool_use":
-            patchAssistant({ activity: activityLabel(event.tool) });
+            appendPart({
+              type: "tool_use",
+              id: event.id,
+              tool: event.tool,
+              input: event.input,
+              result: null,
+            });
             break;
           case "tool_result":
-            patchAssistant({ activity: null });
+            patchAssistant((m) => ({
+              ...m,
+              parts: (m.parts ?? []).map((p) =>
+                p.type === "tool_use" && p.id === event.tool_use_id
+                  ? {
+                      ...p,
+                      result: { is_error: event.is_error, content: event.content },
+                    }
+                  : p,
+              ),
+            }));
             break;
           case "briefing_published":
             setLiveBriefing(event.briefing);
             break;
           case "done":
-            patchAssistant({ status: "done", activity: null });
+            patchAssistant((m) => ({
+              ...m,
+              status: "done",
+              parts: (m.parts ?? []).map((p) =>
+                p.type === "thinking" ? { ...p, streaming: false } : p,
+              ),
+            }));
             break;
           case "error":
-            patchAssistant({
+            patchAssistant((m) => ({
+              ...m,
               status: "error",
-              activity: null,
               content: `Something went wrong (${event.code}): ${event.message}`,
-            });
+            }));
             break;
         }
       };
@@ -121,11 +150,11 @@ export function useChat(patientId: number | undefined) {
         setLiveMessages([]);
       } catch (error) {
         if (!controller.signal.aborted) {
-          patchAssistant({
+          patchAssistant((m) => ({
+            ...m,
             status: "error",
-            activity: null,
             content: error instanceof Error ? error.message : "Request failed",
-          });
+          }));
         }
       } finally {
         setIsStreaming(false);

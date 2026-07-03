@@ -44,6 +44,8 @@ from claude_agent_sdk import (
     ResultMessage,
     SystemMessage,
     TextBlock,
+    ThinkingBlock,
+    ToolResultBlock,
     ToolUseBlock,
     UserMessage,
     create_sdk_mcp_server,
@@ -175,6 +177,14 @@ def build_chat_options(
         # A briefing turn is skill + several searches + publish; well above
         # the briefing endpoints' max_turns=4.
         max_turns=12,
+        # Extended thinking: without this the request carries no thinking
+        # param, and Gemini (via LiteLLM -> Vertex thinkingConfig) reasons
+        # invisibly — thought traces are only returned when explicitly enabled.
+        thinking=(
+            {"type": "enabled", "budget_tokens": settings.ai_thinking_budget}
+            if settings.ai_thinking_budget > 0
+            else None
+        ),
         permission_mode="bypassPermissions",
         env=_proxy_env(),
         cwd=str(AGENT_HOME),
@@ -188,20 +198,51 @@ def _short_tool_name(name: str) -> str:
     return name.split("__")[-1]
 
 
+RESULT_PREVIEW_LIMIT = 600
+
+
+def _result_preview(content: Any) -> str:
+    """Flatten a ToolResultBlock's content into a short display string.
+
+    Content arrives as a plain string or a list of content dicts; anything
+    beyond the preview limit is truncated — the full result already reached
+    the model, this copy is only for the UI trace.
+    """
+    if content is None:
+        return ""
+    if isinstance(content, str):
+        text = content
+    else:
+        text = "\n".join(
+            d.get("text", "")
+            for d in content
+            if isinstance(d, dict) and d.get("type") == "text"
+        )
+    if len(text) > RESULT_PREVIEW_LIMIT:
+        return text[:RESULT_PREVIEW_LIMIT] + "…"
+    return text
+
+
 async def drive_chat_turn(
     prompt: str,
     options: ClaudeAgentOptions,
     queue: Queue[ChatEvent],
-) -> tuple[str | None, str]:
+) -> tuple[str | None, str, list[dict[str, Any]]]:
     """Run one chat turn, translating SDK messages into SSE events on the queue.
 
-    Returns (session_id, assistant_text). The caller owns the terminal
-    done/error event — this function only reports what the agent did.
+    Returns (session_id, assistant_text, trace). The trace is the ordered list
+    of parts the agent produced — thinking, tool calls (with inputs and result
+    previews), and text — persisted so the UI can replay the agent's work
+    after a refresh. The caller owns the terminal done/error event.
     Raises BriefingGenerationError on agent/CLI failure (same error taxonomy
     as the briefing paths, so the router maps them identically).
     """
     session_id: str | None = None
     text_parts: list[str] = []
+    trace: list[dict[str, Any]] = []
+    # tool_use_id -> its trace entry, so results can be attached when they
+    # come back (as UserMessage tool-result blocks) a few messages later.
+    pending_tools: dict[str, dict[str, Any]] = {}
     result: ResultMessage | None = None
     try:
         async with ClaudeSDKClient(options) as client:
@@ -214,20 +255,54 @@ async def drive_chat_turn(
                     for block in message.content:
                         if isinstance(block, TextBlock):
                             text_parts.append(block.text)
+                            trace.append({"type": "text", "text": block.text})
                             await queue.put(("text", {"text": block.text}))
+                        elif isinstance(block, ThinkingBlock):
+                            # Reasoning tokens (when the model/proxy surfaces
+                            # them) — streamed and persisted like any part.
+                            trace.append({"type": "thinking", "text": block.thinking})
+                            await queue.put(("thinking", {"text": block.thinking}))
                         elif isinstance(block, ToolUseBlock):
                             short = _short_tool_name(block.name)
                             # publish_briefing's input is the entire briefing;
                             # the briefing_published event already carries it.
-                            payload = (
-                                {} if short == "publish_briefing" else block.input
-                            )
+                            payload = {} if short == "publish_briefing" else block.input
+                            entry: dict[str, Any] = {
+                                "type": "tool_use",
+                                "id": block.id,
+                                "tool": short,
+                                "input": payload,
+                                "result": None,
+                            }
+                            trace.append(entry)
+                            pending_tools[block.id] = entry
                             await queue.put(
-                                ("tool_use", {"tool": short, "input": payload})
+                                (
+                                    "tool_use",
+                                    {"id": block.id, "tool": short, "input": payload},
+                                )
                             )
                 elif isinstance(message, UserMessage):
                     # In the SDK loop, UserMessage = tool results fed back.
-                    await queue.put(("tool_result", {}))
+                    blocks = (
+                        message.content if isinstance(message.content, list) else []
+                    )
+                    for block in blocks:
+                        if not isinstance(block, ToolResultBlock):
+                            continue
+                        outcome = {
+                            "is_error": bool(block.is_error),
+                            "content": _result_preview(block.content),
+                        }
+                        pending = pending_tools.pop(block.tool_use_id, None)
+                        if pending is not None:
+                            pending["result"] = outcome
+                        await queue.put(
+                            (
+                                "tool_result",
+                                {"tool_use_id": block.tool_use_id, **outcome},
+                            )
+                        )
                 elif isinstance(message, ResultMessage):
                     session_id = message.session_id or session_id
                     if message.is_error:
@@ -287,4 +362,4 @@ async def drive_chat_turn(
         result.num_turns,
         result.total_cost_usd or 0,
     )
-    return session_id, "".join(text_parts)
+    return session_id, "".join(text_parts), trace

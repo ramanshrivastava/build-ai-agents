@@ -124,17 +124,21 @@ async def stream_chat_turn(
         async def run_turn() -> None:
             """Producer: drive the agent, then persist and signal completion."""
             try:
-                session_id, assistant_text = await drive_chat_turn(
+                session_id, assistant_text, trace = await drive_chat_turn(
                     message, options, queue
                 )
                 if session_id:
                     conversation.session_id = session_id
-                if assistant_text:
+                if assistant_text or trace:
                     session.add(
                         ConversationMessage(
                             conversation_id=conversation.id,
                             role="assistant",
                             content=assistant_text,
+                            # Full ordered trace (thinking, tool calls with
+                            # results, text) so the UI can replay the agent's
+                            # work after a refresh.
+                            trace=trace or None,
                         )
                     )
                 await session.commit()

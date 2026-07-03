@@ -4,22 +4,25 @@ import { parseSSEChunk } from "./api";
 describe("parseSSEChunk", () => {
   it("parses complete frames of each event kind", () => {
     const chunk =
+      'event: thinking\ndata: {"text": "hmm"}\n\n' +
       'event: text\ndata: {"text": "hello"}\n\n' +
-      'event: tool_use\ndata: {"tool": "search_clinical_guidelines", "input": {"query": "q"}}\n\n' +
-      "event: tool_result\ndata: {}\n\n" +
+      'event: tool_use\ndata: {"id": "t1", "tool": "search_clinical_guidelines", "input": {"query": "q"}}\n\n' +
+      'event: tool_result\ndata: {"tool_use_id": "t1", "is_error": false, "content": "excerpt"}\n\n' +
       'event: done\ndata: {"session_id": "s-1"}\n\n';
 
     const { events, rest } = parseSSEChunk("", chunk);
 
     expect(rest).toBe("");
     expect(events).toEqual([
+      { kind: "thinking", text: "hmm" },
       { kind: "text", text: "hello" },
       {
         kind: "tool_use",
+        id: "t1",
         tool: "search_clinical_guidelines",
         input: { query: "q" },
       },
-      { kind: "tool_result" },
+      { kind: "tool_result", tool_use_id: "t1", is_error: false, content: "excerpt" },
       { kind: "done", session_id: "s-1" },
     ]);
   });

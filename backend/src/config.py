@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # stays on Anthropic (it is server-hosted and cannot be re-pointed).
     anthropic_base_url: str = ""
     anthropic_auth_token: str = ""
+    # Extended-thinking token budget for the unified chat agent. 0 disables.
+    # Sent as the Anthropic `thinking` param; for Gemini via LiteLLM this maps
+    # to Vertex thinkingConfig (thinkingBudget + includeThoughts), which is
+    # what makes the model's reasoning traces visible in the chat UI.
+    ai_thinking_budget: int = 8192
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/build_ai_agents"
     debug: bool = False
 
