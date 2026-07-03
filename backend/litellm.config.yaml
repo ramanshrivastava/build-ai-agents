@@ -1,0 +1,72 @@
+# LiteLLM proxy config — translates the Anthropic Messages API (POST /v1/messages,
+# which is what claude_agent_sdk speaks) into Vertex AI Gemini, so the briefing
+# agent can run on Gemini using your gcloud (Vertex AI) credits.
+#
+# claude-code-router CANNOT do this: its Gemini transformer only speaks the
+# AI Studio Developer API (API-key, separate quota), not Vertex.
+#
+# CREDENTIALS — a service-account key works without `gcloud auth
+# application-default login`:
+#   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/vertex-service-account.json"
+#   export GCP_PROJECT_ID="your-gcp-project-id"   # interpolated below via os.environ/
+# LiteLLM's Vertex backend uses google-auth, which reads
+# GOOGLE_APPLICATION_CREDENTIALS automatically (the same default-credentials
+# mechanism the official Google SDKs use). The key should belong to a service
+# account with Vertex AI access (roles/aiplatform.user) on the project whose
+# Vertex credits you want to spend.
+# (If you copy the JSON into backend/secrets/, add `secrets/` to .gitignore —
+#  this repo only ignores .env* today. Never commit key material.)
+#
+# Install + run the proxy (from repo root):
+#   uv tool install "litellm[proxy]"            # one time, no LiteLLM account
+#   litellm --config backend/litellm.config.yaml --port 4000
+#
+# Smoke-test the proxy alone (no backend) before wiring it in:
+#   bash backend/litellm_smoke_test.sh
+#
+# Then point the backend at it (override any inherited ANTHROPIC_BASE_URL):
+#   # AI_MODEL must equal one of the model_name values below.
+#   ANTHROPIC_BASE_URL=http://localhost:4000 \
+#   AI_MODEL=gemini-3.1-pro-preview \
+#   cd backend && uv run uvicorn src.main:app --reload
+#
+# LiteLLM maps model_name -> vertex_ai/<model> and translates tool_use
+# (Anthropic <-> Gemini functionCall) and response schemas. Verify structured
+# output + tool calling end-to-end (task A6) — Gemini's JSON-schema support is
+# narrower than Claude's, so PatientBriefing.model_json_schema() may need
+# simplification (see plan A5).
+
+model_list:
+  - model_name: gemini-2.5-pro
+    litellm_params:
+      model: vertex_ai/gemini-2.5-pro
+      vertex_project: "os.environ/GCP_PROJECT_ID" # reads $GCP_PROJECT_ID (same var the backend uses)
+      vertex_location: "us-central1"
+      # Auth: picked up automatically from $GOOGLE_APPLICATION_CREDENTIALS
+      # (google-auth default-credentials chain). No key material in this file.
+      drop_params: true # drop unsupported Claude params (effort, cache_control) instead of erroring
+  - model_name: gemini-3.1-pro-preview-customtools
+    litellm_params:
+      model: vertex_ai/gemini-3.1-pro-preview-customtools
+      vertex_project: "os.environ/GCP_PROJECT_ID"
+      vertex_location: "global"
+      drop_params: true
+  - model_name: gemini-3.1-pro-preview
+    litellm_params:
+      model: vertex_ai/gemini-3.1-pro-preview
+      vertex_project: "os.environ/GCP_PROJECT_ID"
+      vertex_location: "global"
+      drop_params: true
+
+# Optional: protect the local proxy. If set, the backend's ANTHROPIC_AUTH_TOKEN
+# must equal this key (LiteLLM verifies it on /v1/messages).
+# general_settings:
+#   master_key: sk-litellm
+
+# Vertex alternatives to swap in:
+#   - model_name: gemini-2.5-flash   # cheaper/faster tier, good for high-volume tasks
+#     litellm_params:
+#       model: vertex_ai/gemini-2.5-flash
+#       vertex_project: "os.environ/GCP_PROJECT_ID"
+#       vertex_location: "us-central1"
+#       drop_params: true

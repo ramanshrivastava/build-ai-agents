@@ -13,6 +13,7 @@ from rich.logging import RichHandler
 from src.config import settings
 from src.database import engine
 from src.routers.briefings import router as briefings_router
+from src.routers.chat import router as chat_router
 from src.routers.patients import router as patients_router
 
 logging.basicConfig(
@@ -29,9 +30,26 @@ if settings.debug:
     for name in ("src.agents", "src.services", "src.routers"):
         logging.getLogger(name).setLevel(logging.DEBUG)
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # Surface the effective LLM routing at boot so it's obvious whether the
+    # agent is hitting Anthropic directly or going through a translation proxy
+    # (e.g. LiteLLM -> Vertex Gemini).
+    logger.info(
+        "LLM routing: model=%s via %s",
+        settings.ai_model,
+        settings.anthropic_base_url or "direct (Anthropic)",
+    )
+    if settings.anthropic_base_url and settings.ai_model.startswith("claude"):
+        logger.warning(
+            "ANTHROPIC_BASE_URL is set (proxy mode) but AI_MODEL=%s looks like a "
+            "Claude id — set AI_MODEL to the proxy model name (e.g. gemini-2.5-pro) "
+            "or the proxy will receive a model it doesn't know.",
+            settings.ai_model,
+        )
     yield
     await engine.dispose()
 
@@ -53,6 +71,7 @@ app.add_middleware(
 
 app.include_router(patients_router)
 app.include_router(briefings_router)
+app.include_router(chat_router)
 
 
 @app.get("/health")

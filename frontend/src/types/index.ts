@@ -61,9 +61,72 @@ export interface PatientBriefing {
   summary: BriefingSummary;
   suggested_actions: SuggestedAction[];
   generated_at: string;
+  /** Persisted briefing id (present when the backend stored it). */
+  id?: number | null;
 }
 
 export type BriefingRuntime = 'sdk' | 'managed';
+
+// --- Unified patient chat (SSE) ---
+
+export type ChatRole = 'user' | 'assistant';
+
+export interface ToolResult {
+  is_error: boolean;
+  content: string;
+}
+
+/**
+ * One part of an assistant turn, in the order the agent produced it.
+ * Mirrors the backend's persisted `trace` items, plus a client-only
+ * `streaming` flag on thinking parts (caret while tokens arrive).
+ */
+export type TracePart =
+  | { type: 'thinking'; text: string; streaming?: boolean }
+  | { type: 'text'; text: string }
+  | {
+      type: 'tool_use';
+      id: string;
+      tool: string;
+      input: Record<string, unknown>;
+      result?: ToolResult | null;
+    };
+
+/** One rendered bubble in the chat thread. */
+export interface ChatMessage {
+  id: string;
+  role: ChatRole;
+  content: string;
+  status?: 'streaming' | 'done' | 'error';
+  /** Ordered agent trace for assistant turns (thinking, tool calls, text). */
+  parts?: TracePart[];
+}
+
+/**
+ * Discriminated union mirroring the backend's SSE event vocabulary
+ * (see backend/src/routers/chat.py): one variant per `event:` name.
+ */
+export type ChatEvent =
+  | { kind: 'thinking'; text: string }
+  | { kind: 'text'; text: string }
+  | { kind: 'tool_use'; id: string; tool: string; input: Record<string, unknown> }
+  | { kind: 'tool_result'; tool_use_id: string; is_error: boolean; content: string }
+  | { kind: 'briefing_published'; briefing: PatientBriefing }
+  | { kind: 'done'; session_id: string | null }
+  | { kind: 'error'; code: string; message: string };
+
+export interface ChatHistoryMessage {
+  role: ChatRole;
+  content: string;
+  trace: TracePart[] | null;
+  created_at: string;
+}
+
+export interface ChatHistoryResponse {
+  conversation_id: number | null;
+  messages: ChatHistoryMessage[];
+  latest_briefing: PatientBriefing | null;
+}
 
 export interface ApiErrorDetail {
   code: string;

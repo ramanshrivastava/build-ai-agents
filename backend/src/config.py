@@ -12,6 +12,18 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str = ""
     ai_model: str = "claude-opus-4-6"
+    # Optional: route the SDK briefing agent through a translation proxy (e.g.
+    # LiteLLM pointing at Vertex Gemini). When set, ai_model is the model NAME
+    # the proxy expects (e.g. gemini-2.5-pro), not a real Claude id. Only the
+    # in-process and HTTP-MCP SDK paths follow this; the Managed Agents path
+    # stays on Anthropic (it is server-hosted and cannot be re-pointed).
+    anthropic_base_url: str = ""
+    anthropic_auth_token: str = ""
+    # Extended-thinking token budget for the unified chat agent. 0 disables.
+    # Sent as the Anthropic `thinking` param; for Gemini via LiteLLM this maps
+    # to Vertex thinkingConfig (thinkingBudget + includeThoughts), which is
+    # what makes the model's reasoning traces visible in the chat UI.
+    ai_thinking_budget: int = 8192
     database_url: str = "postgresql+asyncpg://user:pass@localhost:5432/build_ai_agents"
     debug: bool = False
 
@@ -35,6 +47,16 @@ class Settings(BaseSettings):
     gcp_location: str = "us-central1"
     embedding_model: str = "text-embedding-005"
     embedding_dimensions: int = 768
+
+    # External HTTP MCP server (third tool path; FastMCP over Streamable HTTP)
+    # mcp_server_* configure the standalone server process (mcp_server/server.py);
+    # external_mcp_url is where the agent connects to reach it.
+    mcp_server_host: str = "127.0.0.1"
+    mcp_server_port: int = 9000
+    # Canonical FastMCP Streamable HTTP path is /mcp (no trailing slash); a
+    # trailing slash 307-redirects, which the SDK's MCP client does not follow.
+    external_mcp_url: str = "http://127.0.0.1:9000/mcp"
+    external_mcp_auth_token: str = ""  # optional; sent as Authorization: Bearer ...
 
 
 settings = Settings()

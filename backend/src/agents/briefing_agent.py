@@ -185,14 +185,40 @@ async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
     yield {"type": "user", "message": {"role": "user", "content": text}}
 
 
-async def generate_briefing(patient: Patient) -> BriefingResponse:
-    """Generate a RAG-augmented patient briefing using the multi-turn agent."""
-    patient_json = _serialize_patient(patient)
+def _proxy_env() -> dict[str, str]:
+    """Env vars that route the spawned Claude Code CLI subprocess through the
+    configured translation proxy (e.g. LiteLLM → Vertex Gemini).
 
-    options = ClaudeAgentOptions(
+    Mirrors the per-process env the `glm` shell function sets, but driven from
+    app config so deployed environments can use it too. Empty unless
+    ANTHROPIC_BASE_URL is set. The SDK merges this over os.environ when spawning
+    the CLI (`{**os.environ, **options.env}`), so it overrides cleanly without
+    mutating the current process. Only the SDK paths use this; the Managed
+    Agents path cannot be re-pointed (server-hosted by Anthropic).
+    """
+    if not settings.anthropic_base_url:
+        return {}
+    return {
+        "ANTHROPIC_BASE_URL": settings.anthropic_base_url,
+        "ANTHROPIC_AUTH_TOKEN": settings.anthropic_auth_token or "dummy",
+        # Map every Claude tier the CLI may resolve internally onto the proxy
+        # model name, so no background call escapes to real Anthropic.
+        "ANTHROPIC_DEFAULT_OPUS_MODEL": settings.ai_model,
+        "ANTHROPIC_DEFAULT_SONNET_MODEL": settings.ai_model,
+        "ANTHROPIC_DEFAULT_HAIKU_MODEL": settings.ai_model,
+    }
+
+
+def _build_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
+    """Build the agent options shared by every tool path.
+
+    Only the `mcp_servers` value differs between the in-process and external-HTTP
+    paths; the tool name, system prompt, output schema, and turn budget are identical.
+    """
+    return ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
         model=settings.ai_model,
-        mcp_servers={"briefing": briefing_tools},
+        mcp_servers=mcp_servers,
         allowed_tools=["mcp__briefing__search_clinical_guidelines"],
         output_format={
             "type": "json_schema",
@@ -200,21 +226,56 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
         },
         max_turns=4,
         permission_mode="bypassPermissions",
+        env=_proxy_env(),
     )
 
-    logger.info(
-        "Starting RAG agent: model=%s max_turns=%d tools=%s",
-        settings.ai_model,
-        4,
-        options.allowed_tools,
-    )
-    logger.info("Patient: %s, conditions=%s", patient.name, patient.conditions)
-    logger.debug("Patient JSON prompt:\n%s", patient_json)
 
-    result = None
+def _http_mcp_servers() -> dict[str, Any]:
+    """Build the external HTTP MCP server config for the FastMCP server.
+
+    Adds a bearer token header only when one is configured, matching the
+    optional auth on the standalone server (`mcp_server/server.py`).
+    """
+    config: dict[str, Any] = {"type": "http", "url": settings.external_mcp_url}
+    if settings.external_mcp_auth_token:
+        config["headers"] = {
+            "Authorization": f"Bearer {settings.external_mcp_auth_token}"
+        }
+    return {"briefing": config}
+
+
+async def generate_briefing(patient: Patient) -> BriefingResponse:
+    """Generate a RAG-augmented briefing using in-process SDK MCP tools."""
+    options = _build_options({"briefing": briefing_tools})
+    return await _run_briefing(patient, options, label="RAG agent (in-process MCP)")
+
+
+async def generate_briefing_via_http_mcp(patient: Patient) -> BriefingResponse:
+    """Generate a briefing where the search tool is served by an external HTTP MCP server.
+
+    The tool runs in the standalone FastMCP server (`mcp_server/server.py`) reached over
+    Streamable HTTP, rather than in-process. Identical behavior otherwise.
+    """
+    options = _build_options(_http_mcp_servers())
+    return await _run_briefing(patient, options, label="HTTP MCP agent")
+
+
+async def _run_query_to_result(
+    prompt: AsyncIterator[dict[str, Any]],
+    options: ClaudeAgentOptions,
+    *,
+    label: str,
+) -> ResultMessage:
+    """Drive the SDK query() loop to completion and return the ResultMessage.
+
+    Encapsulates the per-turn logging and the CLI/shutdown error handling shared
+    by briefing generation and follow-up answers. Raises BriefingGenerationError
+    on any agent/CLI failure.
+    """
+    result: ResultMessage | None = None
     turn = 0
     try:
-        async for message in query(prompt=_as_stream(patient_json), options=options):
+        async for message in query(prompt=prompt, options=options):
             if isinstance(message, AssistantMessage):
                 turn += 1
                 _log_assistant_message(message, turn)
@@ -237,17 +298,12 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
                 )
             elif isinstance(message, ResultMessage):
                 _log_result_message(message)
-                if not message.is_error and message.structured_output is not None:
-                    briefing = PatientBriefing.model_validate(message.structured_output)
-                    result = BriefingResponse(
-                        **briefing.model_dump(),
-                        generated_at=datetime.datetime.now(datetime.UTC),
-                    )
                 if message.is_error:
                     raise BriefingGenerationError(
                         code="AGENT_ERROR",
                         message=message.result or "Agent returned an error",
                     )
+                result = message
     except BriefingGenerationError:
         raise
     except CLINotFoundError:
@@ -291,15 +347,119 @@ async def generate_briefing(patient: Patient) -> BriefingResponse:
             message=f"Failed to parse agent response: {e}",
         )
 
-    if result is not None:
-        logger.info(
-            "RAG briefing complete: %d flags, %d actions",
-            len(result.flags),
-            len(result.suggested_actions),
+    if result is None:
+        raise BriefingGenerationError(
+            code="NO_RESULT",
+            message="Agent did not return a result message",
         )
-        return result
+    return result
 
-    raise BriefingGenerationError(
-        code="NO_RESULT",
-        message="Agent did not return a result message",
+
+async def _run_briefing(
+    patient: Patient,
+    options: ClaudeAgentOptions,
+    *,
+    label: str,
+) -> BriefingResponse:
+    """Run the multi-turn agent loop for the given options and return the briefing."""
+    patient_json = _serialize_patient(patient)
+
+    logger.info(
+        "Starting %s: model=%s routing=%s max_turns=%s tools=%s",
+        label,
+        settings.ai_model,
+        settings.anthropic_base_url or "direct (Anthropic)",
+        options.max_turns,
+        options.allowed_tools,
     )
+    # Never log patient data (name, conditions, record contents) — ids and
+    # sizes only.
+    logger.info(
+        "Patient id=%s, condition_count=%d", patient.id, len(patient.conditions)
+    )
+    logger.debug("Patient JSON prompt length: %d chars", len(patient_json))
+
+    message = await _run_query_to_result(_as_stream(patient_json), options, label=label)
+    if message.structured_output is None:
+        raise BriefingGenerationError(
+            code="NO_RESULT",
+            message="Agent did not return structured output",
+        )
+    briefing = PatientBriefing.model_validate(message.structured_output)
+    logger.info(
+        "%s complete: %d flags, %d actions",
+        label,
+        len(briefing.flags),
+        len(briefing.suggested_actions),
+    )
+    return BriefingResponse(
+        **briefing.model_dump(),
+        generated_at=datetime.datetime.now(datetime.UTC),
+    )
+
+
+# --- Follow-up Q&A (conversational) ---
+
+FOLLOWUP_SYSTEM_PROMPT = """\
+You are a clinical decision support assistant. The physician has received a \
+pre-consultation briefing for a patient and is now asking follow-up questions.
+
+Answer concisely. Ground every clinical claim in the provided briefing or in \
+evidence retrieved via the search_clinical_guidelines tool, and cite sources as \
+[source_id]. If the question cannot be answered from the record or guidelines, \
+say so explicitly rather than guessing.
+"""
+
+
+def _build_followup_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
+    """Options for a follow-up turn: same tool access, free-text (no schema)."""
+    return ClaudeAgentOptions(
+        system_prompt=FOLLOWUP_SYSTEM_PROMPT,
+        model=settings.ai_model,
+        mcp_servers=mcp_servers,
+        allowed_tools=["mcp__briefing__search_clinical_guidelines"],
+        max_turns=4,
+        permission_mode="bypassPermissions",
+        env=_proxy_env(),
+    )
+
+
+async def answer_followup_question(
+    patient: Patient,
+    briefing_content: dict[str, Any],
+    history: list[tuple[str, str]],
+    question: str,
+) -> str:
+    """Answer a clinician's follow-up question about an existing briefing.
+
+    Free-text answer (no structured output). The RAG tool stays available so the
+    agent can look up guidelines. Reuses the in-process MCP tool server and the
+    same proxy routing as briefing generation. `history` is the prior turns as
+    (role, content) pairs.
+    """
+    patient_json = _serialize_patient(patient)
+    sections = [
+        f"PATIENT RECORD (JSON):\n{patient_json}",
+        "PRE-CONSULTATION BRIEFING (already generated for this patient):\n"
+        + json.dumps(briefing_content, default=str, indent=2),
+    ]
+    if history:
+        transcript = "\n\n".join(
+            f"{'Physician' if role == 'user' else 'Assistant'}: {text}"
+            for role, text in history
+        )
+        sections.append("PRIOR FOLLOW-UP Q&A IN THIS CONVERSATION:\n" + transcript)
+    sections.append("PHYSICIAN'S NEW QUESTION:\n" + question)
+    prompt = "\n\n".join(sections)
+
+    logger.info(
+        "Starting follow-up: model=%s routing=%s prior_turns=%d",
+        settings.ai_model,
+        settings.anthropic_base_url or "direct (Anthropic)",
+        len(history),
+    )
+    options = _build_followup_options({"briefing": briefing_tools})
+    message = await _run_query_to_result(
+        _as_stream(prompt), options, label="follow-up agent"
+    )
+    return message.result or ""

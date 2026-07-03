@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 # --- Patient API schemas ---
@@ -61,7 +61,71 @@ class PatientBriefing(BaseModel):
 
 
 class BriefingResponse(PatientBriefing):
+    # Persisted briefing id, used to open a follow-up conversation. None when the
+    # briefing was not stored (e.g. endpoints that don't persist).
+    id: int | None = None
     generated_at: datetime.datetime
+
+
+# --- Follow-up chat (conversational) ---
+
+
+class BriefingChatRequest(BaseModel):
+    question: str
+
+    @field_validator("question")
+    @classmethod
+    def question_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question must not be blank")
+        return value.strip()
+
+
+class BriefingChatMessage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+    content: str
+    created_at: datetime.datetime
+
+
+class BriefingChatResponse(BaseModel):
+    briefing_id: int
+    answer: str
+    history: list[BriefingChatMessage]
+
+
+# --- Unified patient chat (SSE) ---
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+    @field_validator("message")
+    @classmethod
+    def message_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("message must not be blank")
+        return value.strip()
+
+
+class ChatMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    role: str
+    content: str
+    # Agent trace for assistant turns: ordered thinking / tool_use / text
+    # parts, exactly as they streamed. None for user messages.
+    trace: list[dict] | None = None
+    created_at: datetime.datetime
+
+
+class ChatHistoryResponse(BaseModel):
+    """Everything the UI needs to rehydrate a patient's chat after a refresh."""
+
+    conversation_id: int | None
+    messages: list[ChatMessageOut]
+    latest_briefing: BriefingResponse | None
 
 
 # --- Error schema ---

@@ -8,7 +8,13 @@ from unittest.mock import AsyncMock, patch
 import pytest
 
 from src.models.orm import Patient
-from src.agents.briefing_agent import generate_briefing
+from src.agents.briefing_agent import (
+    _build_options,
+    _proxy_env,
+    briefing_tools,
+    generate_briefing,
+    generate_briefing_via_http_mcp,
+)
 from src.services.briefing_service import BriefingGenerationError
 
 # --- Fixtures ---
@@ -145,6 +151,37 @@ async def test_generate_briefing_uses_mcp_server(mock_query, fake_patient):
 
 
 @patch("src.agents.briefing_agent.query")
+async def test_http_mcp_briefing_uses_external_server(mock_query, fake_patient):
+    """The HTTP-MCP path configures an external Streamable HTTP server, same tool/turns."""
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    result = await generate_briefing_via_http_mcp(fake_patient)
+
+    assert len(result.flags) == 2
+    options = mock_query.call_args.kwargs["options"]
+    assert options.max_turns == 4
+    assert options.mcp_servers["briefing"]["type"] == "http"
+    assert options.mcp_servers["briefing"]["url"].endswith("/mcp")
+    assert "mcp__briefing__search_clinical_guidelines" in options.allowed_tools
+
+
+@patch("src.agents.briefing_agent.query")
+async def test_http_mcp_briefing_adds_auth_header_when_token_set(
+    mock_query, fake_patient, monkeypatch
+):
+    """A configured token is forwarded as an Authorization: Bearer header."""
+    monkeypatch.setattr("src.config.settings.external_mcp_auth_token", "secret-123")
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    await generate_briefing_via_http_mcp(fake_patient)
+
+    headers = mock_query.call_args.kwargs["options"].mcp_servers["briefing"]["headers"]
+    assert headers["Authorization"] == "Bearer secret-123"
+
+
+@patch("src.agents.briefing_agent.query")
 async def test_generate_briefing_agent_error(mock_query, fake_patient):
     """Agent returns error → BriefingGenerationError."""
     msg = _make_result_message(is_error=True, result="Tool call failed")
@@ -178,3 +215,55 @@ async def test_generate_briefing_cli_not_found(mock_query, fake_patient):
         await generate_briefing(fake_patient)
 
     assert exc_info.value.code == "CLI_NOT_FOUND"
+
+
+# --- Proxy routing (run the SDK agent on Gemini via a translation proxy) ---
+
+
+def test_proxy_env_empty_when_no_base_url(monkeypatch):
+    """Without ANTHROPIC_BASE_URL, no env is injected into the CLI subprocess."""
+    monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    assert _proxy_env() == {}
+
+
+def test_build_options_has_empty_env_by_default(monkeypatch):
+    monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    options = _build_options({"briefing": briefing_tools})
+    assert options.env == {}
+
+
+def test_proxy_env_routes_cli_to_proxy(monkeypatch):
+    """With a base URL set, the CLI subprocess is redirected to the proxy and
+    every internal Claude tier is mapped onto the configured (proxy) model name
+    so no background call escapes to real Anthropic."""
+    monkeypatch.setattr(
+        "src.config.settings.anthropic_base_url", "http://localhost:4000"
+    )
+    monkeypatch.setattr("src.config.settings.anthropic_auth_token", "sk-proxy")
+    monkeypatch.setattr("src.config.settings.ai_model", "gemini-2.5-pro")
+
+    env = _proxy_env()
+    assert env["ANTHROPIC_BASE_URL"] == "http://localhost:4000"
+    assert env["ANTHROPIC_AUTH_TOKEN"] == "sk-proxy"
+    for tier in ("OPUS", "SONNET", "HAIKU"):
+        assert env[f"ANTHROPIC_DEFAULT_{tier}_MODEL"] == "gemini-2.5-pro"
+
+
+def test_proxy_env_uses_dummy_token_when_none(monkeypatch):
+    monkeypatch.setattr(
+        "src.config.settings.anthropic_base_url", "http://localhost:4000"
+    )
+    monkeypatch.setattr("src.config.settings.anthropic_auth_token", "")
+    env = _proxy_env()
+    assert env["ANTHROPIC_AUTH_TOKEN"] == "dummy"
+
+
+def test_build_options_carries_proxy_env_and_model(monkeypatch):
+    """The SDK requests the proxy model name and carries the routing env."""
+    monkeypatch.setattr(
+        "src.config.settings.anthropic_base_url", "http://localhost:4000"
+    )
+    monkeypatch.setattr("src.config.settings.ai_model", "gemini-2.5-pro")
+    options = _build_options({"briefing": briefing_tools})
+    assert options.env["ANTHROPIC_BASE_URL"] == "http://localhost:4000"
+    assert options.model == "gemini-2.5-pro"

@@ -36,3 +36,4 @@ htmlcov/
 
 # Build artifacts
 *.log
+.gstack/
