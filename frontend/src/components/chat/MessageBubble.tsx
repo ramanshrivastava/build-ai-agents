@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { ChatMarkdown } from "./ChatMarkdown";
 import { ReasoningBlock } from "./ReasoningBlock";
 import { ToolCallBadge } from "./ToolCallBadge";
 import type { ChatMessage } from "@/types";
@@ -63,16 +64,17 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                   messageStreaming={isStreaming}
                 />
               ) : (
-                <p key={index} className="my-2 whitespace-pre-wrap leading-relaxed">
-                  {part.text}
-                </p>
+                <ChatMarkdown key={index} text={part.text} />
               ),
             )
-          : message.content && (
+          : message.content &&
+            (isError ? (
               <p className="whitespace-pre-wrap leading-relaxed">
                 {message.content}
               </p>
-            )}
+            ) : (
+              <ChatMarkdown text={message.content} />
+            ))}
       </div>
     </div>
   );
