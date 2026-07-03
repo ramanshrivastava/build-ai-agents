@@ -166,7 +166,12 @@ export const api = {
     if (!response.ok || !response.body) {
       let detail: ApiErrorDetail;
       try {
-        detail = (await response.json()).detail;
+        // ?? guards a JSON body without a detail key — otherwise ApiError's
+        // constructor would throw a TypeError and mask the real status.
+        detail = (await response.json())?.detail ?? {
+          code: "UNKNOWN",
+          message: response.statusText,
+        };
       } catch {
         detail = { code: "UNKNOWN", message: response.statusText };
       }

@@ -49,12 +49,14 @@ async def search_clinical_guidelines(
     Returns relevant passages with source citations. Use this tool to find
     evidence-based recommendations for patient conditions and medications.
     """
+    # Query text can embed patient-derived clinical details — never log it.
     logger.info(
-        "MCP tool call: search_clinical_guidelines(query=%r, specialty=%r, max_results=%d)",
-        query,
+        "MCP tool call: search_clinical_guidelines(specialty=%r, max_results=%d)",
         specialty,
         max_results,
     )
+    if not 1 <= max_results <= 20:
+        raise ValueError("max_results must be between 1 and 20")
     results = await async_search(
         query=query,
         specialty=specialty or None,

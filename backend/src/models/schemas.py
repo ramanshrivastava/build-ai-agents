@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 
 # --- Patient API schemas ---
@@ -73,6 +73,13 @@ class BriefingResponse(PatientBriefing):
 class BriefingChatRequest(BaseModel):
     question: str
 
+    @field_validator("question")
+    @classmethod
+    def question_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("question must not be blank")
+        return value.strip()
+
 
 class BriefingChatMessage(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -93,6 +100,13 @@ class BriefingChatResponse(BaseModel):
 
 class ChatRequest(BaseModel):
     message: str
+
+    @field_validator("message")
+    @classmethod
+    def message_not_blank(cls, value: str) -> str:
+        if not value.strip():
+            raise ValueError("message must not be blank")
+        return value.strip()
 
 
 class ChatMessageOut(BaseModel):

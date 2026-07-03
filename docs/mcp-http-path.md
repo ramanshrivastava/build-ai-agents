@@ -109,7 +109,7 @@ sequenceDiagram
 
 `allowed_tools` encodes both ends of the wiring:
 
-```
+```text
 mcp__briefing__search_clinical_guidelines
      ───┬───   ──────────┬──────────────
         │                └─ tool name (the @mcp.tool function)

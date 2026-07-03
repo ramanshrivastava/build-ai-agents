@@ -23,6 +23,7 @@ Run from backend/ with the nested-CLI env stripped and the proxy vars set:
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 import sys
 import tempfile
@@ -33,6 +34,7 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
+    CLIConnectionError,
     ResultMessage,
     SystemMessage,
     TextBlock,
@@ -84,17 +86,26 @@ async def _run_turn(
     init_sid: str | None = None
     result_sid: str | None = None
     text_parts: list[str] = []
-    async for message in client.receive_response():
-        if isinstance(message, SystemMessage) and message.subtype == "init":
-            init_sid = message.data.get("session_id")
-        elif isinstance(message, AssistantMessage):
-            text_parts.extend(
-                block.text for block in message.content if isinstance(block, TextBlock)
-            )
-        elif isinstance(message, ResultMessage):
-            result_sid = message.session_id
-            if message.is_error:
-                raise RuntimeError(f"turn errored: {message.result}")
+    try:
+        async for message in client.receive_response():
+            if isinstance(message, SystemMessage) and message.subtype == "init":
+                init_sid = message.data.get("session_id")
+            elif isinstance(message, AssistantMessage):
+                text_parts.extend(
+                    block.text
+                    for block in message.content
+                    if isinstance(block, TextBlock)
+                )
+            elif isinstance(message, ResultMessage):
+                result_sid = message.session_id
+                if message.is_error:
+                    raise RuntimeError(f"turn errored: {message.result}")
+    except BaseExceptionGroup as eg:
+        # Mirror the agent code: shutdown can wrap CLIConnectionError in a
+        # task-group ExceptionGroup after a valid result — safe to ignore then.
+        cli_errors = eg.subgroup(CLIConnectionError)
+        if not (cli_errors and result_sid is not None):
+            raise
     return init_sid, result_sid, "".join(text_parts)
 
 
@@ -184,10 +195,19 @@ async def test_queue_interception(cwd: Path) -> None:
             return text
 
     task = asyncio.create_task(drive())
-    # Drain the queue while the turn is still running — proving mid-stream fan-in.
-    published = await asyncio.wait_for(queue.get(), TURN_TIMEOUT)
-    mid_stream = not task.done()
-    text = await asyncio.wait_for(task, TURN_TIMEOUT)
+    try:
+        # Drain the queue while the turn is still running — proving mid-stream
+        # fan-in.
+        published = await asyncio.wait_for(queue.get(), TURN_TIMEOUT)
+        mid_stream = not task.done()
+        text = await asyncio.wait_for(task, TURN_TIMEOUT)
+    finally:
+        # Don't leave the driver (and its SDK subprocess) running if a wait
+        # above timed out.
+        if not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
     print(f"    tool args received: {published} (mid-stream={mid_stream})")
     print(f"    final reply: {text[:120]!r}")
     assert published.get("message") == "hello"

@@ -66,11 +66,18 @@ async def get_history(session: AsyncSession, patient_id: int) -> ChatHistoryResp
         .order_by(Briefing.id.desc())
         .limit(1)
     )
-    latest_briefing = (
-        BriefingResponse(**latest.content, id=latest.id, generated_at=latest.created_at)
-        if latest is not None
-        else None
-    )
+    if latest is not None:
+        # Briefings stored by the older POST /briefing endpoint already carry
+        # id/generated_at inside content; drop them so the DB row's values win
+        # instead of raising duplicate-keyword errors.
+        content = dict(latest.content)
+        content.pop("id", None)
+        content.pop("generated_at", None)
+        latest_briefing = BriefingResponse(
+            **content, id=latest.id, generated_at=latest.created_at
+        )
+    else:
+        latest_briefing = None
     return ChatHistoryResponse(
         conversation_id=conversation.id if conversation else None,
         messages=messages,
@@ -84,13 +91,16 @@ async def reset_conversation(session: AsyncSession, patient_id: int) -> None:
     The SDK-side transcript file is left behind — harmless, since nothing
     resumes it once the session_id row is gone.
     """
-    conversation = await session.scalar(
-        select(Conversation).where(Conversation.patient_id == patient_id)
-    )
-    if conversation is not None:
-        await session.delete(conversation)
-        await session.commit()
-        logger.info("Reset conversation for patient %d", patient_id)
+    # Same per-patient lock as stream_chat_turn: a reset must not delete the
+    # conversation while an in-flight turn is still writing to it.
+    async with _lock_for(patient_id):
+        conversation = await session.scalar(
+            select(Conversation).where(Conversation.patient_id == patient_id)
+        )
+        if conversation is not None:
+            await session.delete(conversation)
+            await session.commit()
+            logger.info("Reset conversation for patient %d", patient_id)
 
 
 async def stream_chat_turn(
@@ -160,6 +170,12 @@ async def stream_chat_turn(
                 if kind in ("done", "error"):
                     break
         finally:
-            # Client disconnected mid-turn (or we're done): stop the agent.
+            # Client disconnected mid-turn (or we're done): stop the agent and
+            # wait for its cleanup before releasing the patient lock, so the
+            # next turn can't race with SDK shutdown.
             if not task.done():
                 task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass

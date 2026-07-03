@@ -142,14 +142,19 @@ export function useChat(patientId: number | undefined) {
 
       const controller = new AbortController();
       abortRef.current = controller;
+      // A patient switch or reset replaces abortRef; once that happens this
+      // stream is stale and must not touch state that now belongs elsewhere.
+      const isCurrentStream = () => abortRef.current === controller;
       try {
         await api.streamChat(patientId, text, handleEvent, controller.signal);
         // Let the persisted history become the source of truth, then drop the
         // live copies so messages don't render twice.
-        await queryClient.invalidateQueries({ queryKey: ["chat", patientId] });
-        setLiveMessages([]);
+        if (isCurrentStream()) {
+          await queryClient.invalidateQueries({ queryKey: ["chat", patientId] });
+          if (isCurrentStream()) setLiveMessages([]);
+        }
       } catch (error) {
-        if (!controller.signal.aborted) {
+        if (!controller.signal.aborted && isCurrentStream()) {
           patchAssistant((m) => ({
             ...m,
             status: "error",
@@ -157,7 +162,7 @@ export function useChat(patientId: number | undefined) {
           }));
         }
       } finally {
-        setIsStreaming(false);
+        if (isCurrentStream()) setIsStreaming(false);
       }
     },
     [patientId, isStreaming, queryClient],

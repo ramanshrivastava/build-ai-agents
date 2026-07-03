@@ -365,15 +365,19 @@ async def _run_briefing(
     patient_json = _serialize_patient(patient)
 
     logger.info(
-        "Starting %s: model=%s routing=%s max_turns=%d tools=%s",
+        "Starting %s: model=%s routing=%s max_turns=%s tools=%s",
         label,
         settings.ai_model,
         settings.anthropic_base_url or "direct (Anthropic)",
-        4,
+        options.max_turns,
         options.allowed_tools,
     )
-    logger.info("Patient: %s, conditions=%s", patient.name, patient.conditions)
-    logger.debug("Patient JSON prompt:\n%s", patient_json)
+    # Never log patient data (name, conditions, record contents) — ids and
+    # sizes only.
+    logger.info(
+        "Patient id=%s, condition_count=%d", patient.id, len(patient.conditions)
+    )
+    logger.debug("Patient JSON prompt length: %d chars", len(patient_json))
 
     message = await _run_query_to_result(_as_stream(patient_json), options, label=label)
     if message.structured_output is None:

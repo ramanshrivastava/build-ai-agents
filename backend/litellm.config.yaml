@@ -8,6 +8,7 @@
 # CREDENTIALS — a service-account key works without `gcloud auth
 # application-default login`:
 #   export GOOGLE_APPLICATION_CREDENTIALS="/path/to/your/vertex-service-account.json"
+#   export GCP_PROJECT_ID="your-gcp-project-id"   # interpolated below via os.environ/
 # LiteLLM's Vertex backend uses google-auth, which reads
 # GOOGLE_APPLICATION_CREDENTIALS automatically (the same default-credentials
 # mechanism the official Google SDKs use). The key should belong to a service
@@ -39,7 +40,7 @@ model_list:
   - model_name: gemini-2.5-pro
     litellm_params:
       model: vertex_ai/gemini-2.5-pro
-      vertex_project: "raman-gcp-project-k8s-dev" # replace with your GCP project id
+      vertex_project: "os.environ/GCP_PROJECT_ID" # reads $GCP_PROJECT_ID (same var the backend uses)
       vertex_location: "us-central1"
       # Auth: picked up automatically from $GOOGLE_APPLICATION_CREDENTIALS
       # (google-auth default-credentials chain). No key material in this file.
@@ -47,13 +48,13 @@ model_list:
   - model_name: gemini-3.1-pro-preview-customtools
     litellm_params:
       model: vertex_ai/gemini-3.1-pro-preview-customtools
-      vertex_project: "raman-gcp-project-k8s-dev"
+      vertex_project: "os.environ/GCP_PROJECT_ID"
       vertex_location: "global"
       drop_params: true
   - model_name: gemini-3.1-pro-preview
     litellm_params:
       model: vertex_ai/gemini-3.1-pro-preview
-      vertex_project: "raman-gcp-project-k8s-dev"
+      vertex_project: "os.environ/GCP_PROJECT_ID"
       vertex_location: "global"
       drop_params: true
 
@@ -66,6 +67,6 @@ model_list:
 #   - model_name: gemini-2.5-flash   # cheaper/faster tier, good for high-volume tasks
 #     litellm_params:
 #       model: vertex_ai/gemini-2.5-flash
-#       vertex_project: "raman-gcp-project-k8s-dev"
+#       vertex_project: "os.environ/GCP_PROJECT_ID"
 #       vertex_location: "us-central1"
 #       drop_params: true

@@ -109,7 +109,9 @@ def make_publish_tool(queue: Queue[ChatEvent], patient_id: int):
         except ValidationError as exc:
             # isError sends the message back to the model so it can correct
             # the payload and retry, instead of failing the whole turn.
-            logger.warning("publish_briefing validation failed: %s", exc)
+            # Log without the error detail — pydantic messages can echo
+            # rejected input, which here is patient briefing content.
+            logger.warning("publish_briefing validation failed")
             return {
                 "content": [{"type": "text", "text": f"Invalid briefing: {exc}"}],
                 "isError": True,
