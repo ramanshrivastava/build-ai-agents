@@ -61,6 +61,33 @@ describe("MessageBubble", () => {
     expect(screen.getByText("Input")).toBeInTheDocument();
   });
 
+  it("renders Bash tool calls as web research with the command preview", () => {
+    render(
+      <MessageBubble
+        message={{
+          ...base,
+          status: "streaming",
+          parts: [
+            {
+              type: "tool_use",
+              id: "t1",
+              tool: "Bash",
+              input: {
+                command: 'firecrawl search "metformin recall" --limit 5',
+                description: "Search the web for metformin recalls",
+              },
+              result: null,
+            },
+          ],
+        }}
+      />,
+    );
+    expect(screen.getByText("Researching the web…")).toBeInTheDocument();
+    expect(
+      screen.getByText("Search the web for metformin recalls"),
+    ).toBeInTheDocument();
+  });
+
   it("renders a collapsed thought process for finished thinking parts", () => {
     render(
       <MessageBubble

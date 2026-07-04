@@ -27,7 +27,9 @@ This module demonstrates the SDK patterns the briefing paths don't:
 
 from __future__ import annotations
 
+import json
 import logging
+import re
 
 from asyncio import Queue
 from pathlib import Path
@@ -79,6 +81,10 @@ provided at the start of the conversation.
 - Only discuss what is visible in the provided patient data.
 - When the physician asks for a briefing or sends /briefing, the briefing
   skill defines the exact workflow — follow it.
+- Web research (the web-research skill, when available) is for
+  recency-sensitive information only — recalls, newly published guidance,
+  safety communications — or when the guidelines search finds nothing.
+  Always cite source URLs for web-derived claims.
 """
 
 
@@ -164,6 +170,26 @@ def build_chat_options(
         version="1.0.0",
         tools=[make_publish_tool(queue, patient_id)],
     )
+    allowed_tools = [
+        "Skill",
+        "mcp__guidelines__search_clinical_guidelines",
+        "mcp__publisher__publish_briefing",
+    ]
+    env = _proxy_env()
+    if settings.firecrawl_api_key:
+        # Fourth tool-integration pattern in this repo: skill + CLI via Bash
+        # (vs in-process MCP, HTTP MCP, and managed tools). The web-research
+        # skill in agent_home instructs the agent to run the `firecrawl` CLI;
+        # the key rides the subprocess environment (options.env is merged over
+        # os.environ when the SDK spawns the CLI), so it never appears on a
+        # command line, in the SSE stream, or in the persisted trace.
+        # pydantic-settings reads .env into Settings — NOT os.environ — which
+        # is why this explicit injection is required.
+        env = {**env, "FIRECRAWL_API_KEY": settings.firecrawl_api_key}
+        # Note: permission_mode="bypassPermissions" already auto-approves any
+        # requested tool; listing Bash here documents intent rather than
+        # granting anything new.
+        allowed_tools.append("Bash")
     return ClaudeAgentOptions(
         system_prompt=f"{CHAT_SYSTEM_PROMPT}\nPATIENT RECORD (JSON):\n{patient_json}",
         model=settings.ai_model,
@@ -171,11 +197,7 @@ def build_chat_options(
             "guidelines": _http_mcp_servers()["briefing"],
             "publisher": publisher,
         },
-        allowed_tools=[
-            "Skill",
-            "mcp__guidelines__search_clinical_guidelines",
-            "mcp__publisher__publish_briefing",
-        ],
+        allowed_tools=allowed_tools,
         # A briefing turn is skill + several searches + publish; well above
         # the briefing endpoints' max_turns=4.
         max_turns=12,
@@ -188,7 +210,7 @@ def build_chat_options(
             else None
         ),
         permission_mode="bypassPermissions",
-        env=_proxy_env(),
+        env=env,
         cwd=str(AGENT_HOME),
         setting_sources=["project"],
         resume=resume_session_id,
@@ -201,6 +223,25 @@ def _short_tool_name(name: str) -> str:
 
 
 RESULT_PREVIEW_LIMIT = 600
+
+# Firecrawl keys are fc-<hex>. Defense-in-depth: the key should only ever live
+# in the subprocess environment, but if the model echoes one (e.g. from a CLI
+# error message) we scrub it before anything reaches the SSE stream or the
+# persisted trace.
+_FC_KEY_RE = re.compile(r"fc-[A-Za-z0-9]{6,}")
+
+
+def _mask_key_material(text: str) -> str:
+    # Exact-match first: self-hosted Firecrawl keys may not match the fc-
+    # pattern, but we always know the configured value.
+    if settings.firecrawl_api_key:
+        text = text.replace(settings.firecrawl_api_key, "fc-<redacted>")
+    return _FC_KEY_RE.sub("fc-<redacted>", text)
+
+
+def _masked_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Scrub key material from a tool input dict (JSON round-trip)."""
+    return json.loads(_mask_key_material(json.dumps(payload, default=str)))
 
 
 def _result_preview(content: Any) -> str:
@@ -221,8 +262,8 @@ def _result_preview(content: Any) -> str:
             if isinstance(d, dict) and d.get("type") == "text"
         )
     if len(text) > RESULT_PREVIEW_LIMIT:
-        return text[:RESULT_PREVIEW_LIMIT] + "…"
-    return text
+        text = text[:RESULT_PREVIEW_LIMIT] + "…"
+    return _mask_key_material(text)
 
 
 async def drive_chat_turn(
@@ -256,9 +297,12 @@ async def drive_chat_turn(
                 elif isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
-                            text_parts.append(block.text)
-                            trace.append({"type": "text", "text": block.text})
-                            await queue.put(("text", {"text": block.text}))
+                            # Masked like tool events: the model could echo a
+                            # key it saw in a CLI error message.
+                            text = _mask_key_material(block.text)
+                            text_parts.append(text)
+                            trace.append({"type": "text", "text": text})
+                            await queue.put(("text", {"text": text}))
                         elif isinstance(block, ThinkingBlock):
                             # Reasoning tokens (when the model/proxy surfaces
                             # them) — streamed and persisted like any part.
@@ -268,7 +312,11 @@ async def drive_chat_turn(
                             short = _short_tool_name(block.name)
                             # publish_briefing's input is the entire briefing;
                             # the briefing_published event already carries it.
-                            payload = {} if short == "publish_briefing" else block.input
+                            payload = (
+                                {}
+                                if short == "publish_briefing"
+                                else _masked_payload(block.input)
+                            )
                             entry: dict[str, Any] = {
                                 "type": "tool_use",
                                 "id": block.id,

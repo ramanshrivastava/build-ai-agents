@@ -191,7 +191,10 @@ async def test_empty_stream_raises_no_result():
 # --- build_chat_options ---
 
 
-def test_build_chat_options_wiring():
+def test_build_chat_options_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
+    # Pin: the real backend/.env may carry a key; this test asserts the
+    # web-tools-disabled baseline.
+    monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "")
     queue: asyncio.Queue = asyncio.Queue()
     options = build_chat_options(queue, 1, "s-resume", '{"name": "Maria"}')
 
@@ -210,9 +213,51 @@ def test_build_chat_options_wiring():
     assert '{"name": "Maria"}' in options.system_prompt
 
 
-def test_build_chat_options_first_turn_no_resume():
+def test_build_chat_options_first_turn_no_resume() -> None:
     options = build_chat_options(asyncio.Queue(), 1, None, "{}")
     assert options.resume is None
+
+
+def test_build_chat_options_web_tools_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With a Firecrawl key: Bash allowed, key injected into subprocess env."""
+    monkeypatch.setattr(
+        "src.agents.chat_agent.settings.firecrawl_api_key", "fc-unit-test-key"
+    )
+    options = build_chat_options(asyncio.Queue(), 1, None, "{}")
+
+    assert "Bash" in options.allowed_tools
+    assert options.env["FIRECRAWL_API_KEY"] == "fc-unit-test-key"
+    # Env delivery, not permission surgery: bypass mode is unchanged.
+    assert options.permission_mode == "bypassPermissions"
+
+
+def test_build_chat_options_web_tools_disabled_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "")
+    options = build_chat_options(asyncio.Queue(), 1, None, "{}")
+
+    assert "Bash" not in options.allowed_tools
+    assert "FIRECRAWL_API_KEY" not in options.env
+
+
+def test_key_material_masked_in_events() -> None:
+    """fc- keys are scrubbed from tool inputs and result previews."""
+    from src.agents.chat_agent import (
+        _mask_key_material,
+        _masked_payload,
+        _result_preview,
+    )
+
+    assert (
+        _mask_key_material("ran with fc-0000fake0000fake0000 oops")
+        == "ran with fc-<redacted> oops"
+    )
+    assert (
+        _masked_payload({"command": "firecrawl search --api-key fc-1111fake1111"})[
+            "command"
+        ]
+        == "firecrawl search --api-key fc-<redacted>"
+    )
+    assert "fc-<redacted>" in _result_preview("error: bad key fc-1111fake1111")
 
 
 # --- publish_briefing tool handler ---

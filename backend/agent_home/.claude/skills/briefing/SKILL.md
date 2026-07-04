@@ -18,7 +18,11 @@ in retrieved clinical evidence.
 2. Call `mcp__guidelines__search_clinical_guidelines` for each major
    condition, and for drug interactions when the patient takes 2+ medications.
    Use specific clinical queries (e.g. "metformin renal dosing eGFR 45"),
-   not vague ones (e.g. "diabetes").
+   not vague ones (e.g. "diabetes"). If any guidelines search returns nothing
+   relevant — for a condition, medication interaction, or screening — and the
+   web-research skill is available, you may search the web for authoritative
+   guidance and cite the source URL in the flag/action description — local
+   guidelines remain the primary source.
 3. Build the briefing:
    - **flags** — category one of `labs` (values outside reference ranges),
      `medications` (interaction/dosing concerns), `screenings` (overdue

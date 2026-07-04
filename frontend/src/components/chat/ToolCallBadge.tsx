@@ -6,6 +6,7 @@ import {
   ChevronDown,
   ChevronRight,
   FileCheck2,
+  Globe,
   Terminal,
   Wand2,
   type LucideIcon,
@@ -44,6 +45,20 @@ const TOOL_CONFIG: Record<string, ToolConfig> = {
     past: "Ran briefing skill",
     inputPreview: (input) =>
       typeof input.command === "string" ? input.command : null,
+  },
+  // Bash is only reachable through the web-research skill (firecrawl CLI),
+  // so the web label is honest.
+  Bash: {
+    icon: Globe,
+    name: "web_research",
+    gerund: "Researching the web",
+    past: "Researched the web",
+    inputPreview: (input) =>
+      typeof input.description === "string" && input.description
+        ? input.description
+        : typeof input.command === "string"
+          ? input.command
+          : null,
   },
 };
 

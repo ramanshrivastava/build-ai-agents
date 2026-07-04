@@ -19,6 +19,11 @@ class Settings(BaseSettings):
     # stays on Anthropic (it is server-hosted and cannot be re-pointed).
     anthropic_base_url: str = ""
     anthropic_auth_token: str = ""
+    # Firecrawl API key for the chat agent's web-research skill (search/scrape
+    # via the `firecrawl` CLI, which must be installed: npm i -g firecrawl-cli).
+    # Delivery path: env/secret -> this setting -> ClaudeAgentOptions.env ->
+    # agent subprocess -> Bash children -> CLI. Empty disables web tools.
+    firecrawl_api_key: str = ""
     # Extended-thinking token budget for the unified chat agent. 0 disables.
     # Sent as the Anthropic `thinking` param; for Gemini via LiteLLM this maps
     # to Vertex thinkingConfig (thinkingBudget + includeThoughts), which is
