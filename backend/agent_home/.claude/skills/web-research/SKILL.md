@@ -6,7 +6,8 @@ description: Search the live web or read a specific web page for recency-sensiti
   when the physician asks to "search the web", "look up the latest", or asks about
   something the guidelines search returned no results for.
 allowed-tools:
-  - Bash(firecrawl *)
+  - Bash(firecrawl search*)
+  - Bash(firecrawl scrape*)
 ---
 
 <!-- Adapted from the official Firecrawl CLI skills (npm: firecrawl-cli,

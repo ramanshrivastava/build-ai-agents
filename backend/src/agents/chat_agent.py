@@ -232,6 +232,10 @@ _FC_KEY_RE = re.compile(r"fc-[A-Za-z0-9]{6,}")
 
 
 def _mask_key_material(text: str) -> str:
+    # Exact-match first: self-hosted Firecrawl keys may not match the fc-
+    # pattern, but we always know the configured value.
+    if settings.firecrawl_api_key:
+        text = text.replace(settings.firecrawl_api_key, "fc-<redacted>")
     return _FC_KEY_RE.sub("fc-<redacted>", text)
 
 
@@ -293,9 +297,12 @@ async def drive_chat_turn(
                 elif isinstance(message, AssistantMessage):
                     for block in message.content:
                         if isinstance(block, TextBlock):
-                            text_parts.append(block.text)
-                            trace.append({"type": "text", "text": block.text})
-                            await queue.put(("text", {"text": block.text}))
+                            # Masked like tool events: the model could echo a
+                            # key it saw in a CLI error message.
+                            text = _mask_key_material(block.text)
+                            text_parts.append(text)
+                            trace.append({"type": "text", "text": text})
+                            await queue.put(("text", {"text": text}))
                         elif isinstance(block, ThinkingBlock):
                             # Reasoning tokens (when the model/proxy surfaces
                             # them) — streamed and persisted like any part.

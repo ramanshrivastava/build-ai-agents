@@ -191,7 +191,7 @@ async def test_empty_stream_raises_no_result():
 # --- build_chat_options ---
 
 
-def test_build_chat_options_wiring(monkeypatch):
+def test_build_chat_options_wiring(monkeypatch: pytest.MonkeyPatch) -> None:
     # Pin: the real backend/.env may carry a key; this test asserts the
     # web-tools-disabled baseline.
     monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "")
@@ -213,12 +213,12 @@ def test_build_chat_options_wiring(monkeypatch):
     assert '{"name": "Maria"}' in options.system_prompt
 
 
-def test_build_chat_options_first_turn_no_resume():
+def test_build_chat_options_first_turn_no_resume() -> None:
     options = build_chat_options(asyncio.Queue(), 1, None, "{}")
     assert options.resume is None
 
 
-def test_build_chat_options_web_tools_enabled(monkeypatch):
+def test_build_chat_options_web_tools_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
     """With a Firecrawl key: Bash allowed, key injected into subprocess env."""
     monkeypatch.setattr(
         "src.agents.chat_agent.settings.firecrawl_api_key", "fc-unit-test-key"
@@ -231,7 +231,7 @@ def test_build_chat_options_web_tools_enabled(monkeypatch):
     assert options.permission_mode == "bypassPermissions"
 
 
-def test_build_chat_options_web_tools_disabled_without_key(monkeypatch):
+def test_build_chat_options_web_tools_disabled_without_key(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "")
     options = build_chat_options(asyncio.Queue(), 1, None, "{}")
 
@@ -239,7 +239,7 @@ def test_build_chat_options_web_tools_disabled_without_key(monkeypatch):
     assert "FIRECRAWL_API_KEY" not in options.env
 
 
-def test_key_material_masked_in_events():
+def test_key_material_masked_in_events() -> None:
     """fc- keys are scrubbed from tool inputs and result previews."""
     from src.agents.chat_agent import (
         _mask_key_material,
@@ -251,9 +251,12 @@ def test_key_material_masked_in_events():
         _mask_key_material("ran with fc-0000fake0000fake0000 oops")
         == "ran with fc-<redacted> oops"
     )
-    assert _masked_payload({"command": "firecrawl search --api-key fc-1111fake1111"})[
-        "command"
-    ] == "firecrawl search --api-key fc-<redacted>"
+    assert (
+        _masked_payload({"command": "firecrawl search --api-key fc-1111fake1111"})[
+            "command"
+        ]
+        == "firecrawl search --api-key fc-<redacted>"
+    )
     assert "fc-<redacted>" in _result_preview("error: bad key fc-1111fake1111")
 
 
