@@ -224,16 +224,21 @@ def _short_tool_name(name: str) -> str:
 
 RESULT_PREVIEW_LIMIT = 600
 
-# Firecrawl keys are fc-<hex>. Defense-in-depth: the key should only ever live
-# in the subprocess environment, but if the model echoes one (e.g. from a CLI
-# error message) we scrub it before anything reaches the SSE stream or the
-# persisted trace.
+# Firecrawl keys are fc-<hex>; Anthropic keys are sk-ant-<...>. Defense-in-depth:
+# both live only in the subprocess environment (where Bash children can read
+# them), but if the model echoes one (e.g. from a CLI error message or `env`)
+# we scrub it before anything reaches the SSE stream or the persisted trace.
 _FC_KEY_RE = re.compile(r"fc-[A-Za-z0-9]{6,}")
+_ANTHROPIC_KEY_RE = re.compile(r"sk-ant-[A-Za-z0-9_-]{6,}")
 
 
 def _mask_key_material(text: str) -> str:
     # Exact-match first: self-hosted Firecrawl keys may not match the fc-
-    # pattern, but we always know the configured value.
+    # pattern, but we always know the configured value. Anthropic first so the
+    # fc- pattern can never bite into the middle of an sk-ant- key.
+    if settings.anthropic_api_key:
+        text = text.replace(settings.anthropic_api_key, "sk-ant-<redacted>")
+    text = _ANTHROPIC_KEY_RE.sub("sk-ant-<redacted>", text)
     if settings.firecrawl_api_key:
         text = text.replace(settings.firecrawl_api_key, "fc-<redacted>")
     return _FC_KEY_RE.sub("fc-<redacted>", text)

@@ -260,6 +260,23 @@ def test_key_material_masked_in_events() -> None:
     assert "fc-<redacted>" in _result_preview("error: bad key fc-1111fake1111")
 
 
+def test_anthropic_key_masked_in_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sk-ant- keys (now in the subprocess env, so `env` in Bash can print
+    them) are scrubbed by pattern and by exact configured value."""
+    from src.agents.chat_agent import _mask_key_material, _result_preview
+
+    monkeypatch.setattr(
+        "src.agents.chat_agent.settings.anthropic_api_key", "custom-key-no-prefix"
+    )
+    assert (
+        _mask_key_material("ANTHROPIC_API_KEY=sk-ant-usr-AAAA_fake-BBBB\nX=1")
+        == "ANTHROPIC_API_KEY=sk-ant-<redacted>\nX=1"
+    )
+    assert "custom-key-no-prefix" not in _result_preview(
+        "env: KEY=custom-key-no-prefix"
+    )
+
+
 # --- publish_briefing tool handler ---
 
 

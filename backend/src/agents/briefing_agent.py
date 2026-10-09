@@ -186,18 +186,26 @@ async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
 
 
 def _proxy_env() -> dict[str, str]:
-    """Env vars that route the spawned Claude Code CLI subprocess through the
-    configured translation proxy (e.g. LiteLLM → Vertex Gemini).
+    """Env vars for the spawned Claude Code CLI subprocess: either direct
+    Anthropic auth, or routing through the configured translation proxy (e.g.
+    LiteLLM → Vertex Gemini).
 
-    Mirrors the per-process env the `glm` shell function sets, but driven from
-    app config so deployed environments can use it too. Empty unless
-    ANTHROPIC_BASE_URL is set. The SDK merges this over os.environ when spawning
-    the CLI (`{**os.environ, **options.env}`), so it overrides cleanly without
-    mutating the current process. Only the SDK paths use this; the Managed
-    Agents path cannot be re-pointed (server-hosted by Anthropic).
+    Without ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY is passed through so the CLI
+    bills that key instead of the developer's Claude Code login (empty when no
+    key is configured — the CLI then falls back to the login). pydantic-settings
+    reads .env into Settings, NOT os.environ, so this explicit injection is
+    required. With a proxy, the proxy branch mirrors the per-process env the
+    `glm` shell function sets, and the real Anthropic key is deliberately NOT
+    forwarded — the proxy only gets its own token. The SDK merges this over
+    os.environ when spawning the CLI (`{**os.environ, **options.env}`), so it
+    overrides cleanly without mutating the current process. Only the SDK paths
+    use this; the Managed Agents path cannot be re-pointed (server-hosted by
+    Anthropic).
     """
     if not settings.anthropic_base_url:
-        return {}
+        if not settings.anthropic_api_key:
+            return {}
+        return {"ANTHROPIC_API_KEY": settings.anthropic_api_key}
     return {
         "ANTHROPIC_BASE_URL": settings.anthropic_base_url,
         "ANTHROPIC_AUTH_TOKEN": settings.anthropic_auth_token or "dummy",

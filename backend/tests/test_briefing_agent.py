@@ -221,15 +221,38 @@ async def test_generate_briefing_cli_not_found(mock_query, fake_patient):
 
 
 def test_proxy_env_empty_when_no_base_url(monkeypatch):
-    """Without ANTHROPIC_BASE_URL, no env is injected into the CLI subprocess."""
+    """Without ANTHROPIC_BASE_URL or a key, no env is injected into the CLI
+    subprocess (the CLI falls back to the developer's Claude Code login)."""
     monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    # Pin: the real backend/.env may carry a key.
+    monkeypatch.setattr("src.config.settings.anthropic_api_key", "")
     assert _proxy_env() == {}
 
 
 def test_build_options_has_empty_env_by_default(monkeypatch):
     monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    monkeypatch.setattr("src.config.settings.anthropic_api_key", "")
     options = _build_options({"briefing": briefing_tools})
     assert options.env == {}
+
+
+def test_proxy_env_passes_api_key_when_direct(monkeypatch):
+    """Without a proxy, the configured key reaches the CLI subprocess so it
+    bills the key instead of the Claude Code login."""
+    monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    monkeypatch.setattr("src.config.settings.anthropic_api_key", "sk-ant-unit-test")
+    assert _proxy_env() == {"ANTHROPIC_API_KEY": "sk-ant-unit-test"}
+
+
+def test_proxy_env_never_forwards_api_key_to_proxy(monkeypatch):
+    """With a proxy, the real Anthropic key must not leak to the proxy."""
+    monkeypatch.setattr(
+        "src.config.settings.anthropic_base_url", "http://localhost:4000"
+    )
+    monkeypatch.setattr("src.config.settings.anthropic_api_key", "sk-ant-unit-test")
+    env = _proxy_env()
+    assert "ANTHROPIC_API_KEY" not in env
+    assert "sk-ant-unit-test" not in env.values()
 
 
 def test_proxy_env_routes_cli_to_proxy(monkeypatch):

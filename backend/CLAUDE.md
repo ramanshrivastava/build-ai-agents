@@ -140,7 +140,9 @@ directly and spawns no CLI.
 
 Required in `.env` (see `.env.example`):
 ```
-# Optional locally (SDK proxies through Claude Code CLI).
+# Optional locally: when empty, the SDK agents fall back to your Claude Code
+# login. When set, the SDK agents (via the spawned CLI) and Managed Agents
+# both bill this key. Never forwarded to an ANTHROPIC_BASE_URL proxy.
 # Required for production/deployed use.
 ANTHROPIC_API_KEY=
 AI_MODEL=claude-opus-4-6
