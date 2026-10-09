@@ -310,9 +310,12 @@ async def drive_chat_turn(
                             await queue.put(("text", {"text": text}))
                         elif isinstance(block, ThinkingBlock):
                             # Reasoning tokens (when the model/proxy surfaces
-                            # them) — streamed and persisted like any part.
-                            trace.append({"type": "thinking", "text": block.thinking})
-                            await queue.put(("thinking", {"text": block.thinking}))
+                            # them) — streamed and persisted like any part,
+                            # masked like text: reasoning can quote a key the
+                            # model saw in tool output (e.g. `env`).
+                            thinking = _mask_key_material(block.thinking)
+                            trace.append({"type": "thinking", "text": thinking})
+                            await queue.put(("thinking", {"text": thinking}))
                         elif isinstance(block, ToolUseBlock):
                             short = _short_tool_name(block.name)
                             # publish_briefing's input is the entire briefing;

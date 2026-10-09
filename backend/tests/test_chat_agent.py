@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
 
 from unittest.mock import patch
 
@@ -275,6 +276,53 @@ def test_anthropic_key_masked_in_events(monkeypatch: pytest.MonkeyPatch) -> None
     assert "custom-key-no-prefix" not in _result_preview(
         "env: KEY=custom-key-no-prefix"
     )
+
+
+@patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
+async def test_anthropic_key_never_reaches_events_or_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End to end through drive_chat_turn: a key surfacing in any projection
+    (thinking, text, tool input, tool result) is redacted in every SSE event,
+    the persisted trace, and the returned text."""
+    key = "sk-ant-usr-FAKE_unit-test-key-0000"
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    FakeClient.messages = [
+        AssistantMessage(
+            content=[
+                ThinkingBlock(thinking=f"env printed {key}", signature="sig"),
+                TextBlock(text=f"Your key is {key}"),
+                ToolUseBlock(id="t1", name="Bash", input={"command": f"echo {key}"}),
+            ],
+            model="test-model",
+        ),
+        UserMessage(
+            content=[
+                ToolResultBlock(
+                    tool_use_id="t1",
+                    content=[{"type": "text", "text": f"ANTHROPIC_API_KEY={key}"}],
+                    is_error=False,
+                )
+            ]
+        ),
+        _result(),
+    ]
+    queue: asyncio.Queue = asyncio.Queue()
+    options = build_chat_options(queue, 1, None, "{}")
+
+    _, text, trace = await drive_chat_turn("hello", options, queue)
+
+    events = [queue.get_nowait() for _ in range(queue.qsize())]
+    assert [kind for kind, _ in events] == [
+        "thinking",
+        "text",
+        "tool_use",
+        "tool_result",
+    ]
+    for surface in (events, trace, text):
+        dumped = json.dumps(surface)
+        assert key not in dumped
+        assert "sk-ant-<redacted>" in dumped
 
 
 # --- publish_briefing tool handler ---
