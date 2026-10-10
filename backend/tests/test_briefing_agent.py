@@ -220,7 +220,7 @@ async def test_generate_briefing_cli_not_found(mock_query, fake_patient):
 # --- Proxy routing (run the SDK agent on Gemini via a translation proxy) ---
 
 
-def test_cli_env_empty_when_no_base_url(monkeypatch):
+def test_cli_env_empty_when_no_base_url(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without ANTHROPIC_BASE_URL or a key, no env is injected into the CLI
     subprocess (the CLI falls back to the developer's Claude Code login)."""
     monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
@@ -236,7 +236,7 @@ def test_build_options_has_empty_env_by_default(monkeypatch):
     assert options.env == {}
 
 
-def test_cli_env_passes_api_key_when_direct(monkeypatch):
+def test_cli_env_passes_api_key_when_direct(monkeypatch: pytest.MonkeyPatch) -> None:
     """Without a proxy, the configured key reaches the CLI subprocess so it
     bills the key instead of the Claude Code login."""
     monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
@@ -244,7 +244,9 @@ def test_cli_env_passes_api_key_when_direct(monkeypatch):
     assert cli_env() == {"ANTHROPIC_API_KEY": "sk-ant-unit-test"}
 
 
-def test_cli_env_never_forwards_api_key_to_proxy(monkeypatch):
+def test_cli_env_never_forwards_api_key_to_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """With a proxy, the real Anthropic key must not leak to the proxy — and a
     key exported in the backend's own environment is blanked, since the SDK
     merges options.env over os.environ (the CLI treats "" as unset)."""
@@ -257,7 +259,7 @@ def test_cli_env_never_forwards_api_key_to_proxy(monkeypatch):
     assert "sk-ant-unit-test" not in env.values()
 
 
-def test_cli_env_routes_cli_to_proxy(monkeypatch):
+def test_cli_env_routes_cli_to_proxy(monkeypatch: pytest.MonkeyPatch) -> None:
     """With a base URL set, the CLI subprocess is redirected to the proxy and
     every internal Claude tier is mapped onto the configured (proxy) model name
     so no background call escapes to real Anthropic."""
@@ -274,7 +276,7 @@ def test_cli_env_routes_cli_to_proxy(monkeypatch):
         assert env[f"ANTHROPIC_DEFAULT_{tier}_MODEL"] == "gemini-2.5-pro"
 
 
-def test_cli_env_uses_dummy_token_when_none(monkeypatch):
+def test_cli_env_uses_dummy_token_when_none(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "src.config.settings.anthropic_base_url", "http://localhost:4000"
     )
@@ -283,7 +285,9 @@ def test_cli_env_uses_dummy_token_when_none(monkeypatch):
     assert env["ANTHROPIC_AUTH_TOKEN"] == "dummy"
 
 
-def test_build_options_carries_cli_env_and_model(monkeypatch):
+def test_build_options_carries_cli_env_and_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The SDK requests the proxy model name and carries the routing env."""
     monkeypatch.setattr(
         "src.config.settings.anthropic_base_url", "http://localhost:4000"

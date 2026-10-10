@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -154,8 +154,11 @@ async def test_generate_briefing_cli_not_found(mock_query, _mock_qdrant, fake_pa
 @patch("src.services.briefing_service._qdrant_available", return_value=False)
 @patch("src.services.briefing_service.query")
 async def test_generate_briefing_v1_carries_cli_env(
-    mock_query, _mock_qdrant, fake_patient, monkeypatch
-):
+    mock_query: MagicMock,
+    _mock_qdrant: AsyncMock,
+    fake_patient: Patient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """The V1 fallback bills the configured key like the RAG paths do, instead
     of silently falling back to the Claude Code login."""
     monkeypatch.setattr("src.config.settings.anthropic_base_url", "")

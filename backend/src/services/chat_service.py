@@ -159,15 +159,18 @@ async def stream_chat_turn(
                 await session.commit()
                 await queue.put(("done", {"session_id": session_id}))
             except BriefingGenerationError as exc:
-                logger.exception("Chat turn failed for patient %d", patient.id)
                 # Error messages can quote CLI/model output (e.g. an auth
-                # failure echoing the key), so mask like every other event.
-                await queue.put(
-                    (
-                        "error",
-                        {"code": exc.code, "message": _mask_key_material(exc.message)},
-                    )
+                # failure echoing the key), so mask like every other event —
+                # and log without the traceback, whose text repeats the raw
+                # message.
+                masked = _mask_key_material(exc.message)
+                logger.error(
+                    "Chat turn failed for patient %d (%s): %s",
+                    patient.id,
+                    exc.code,
+                    masked,
                 )
+                await queue.put(("error", {"code": exc.code, "message": masked}))
             except Exception:
                 logger.exception("Unexpected chat error for patient %d", patient.id)
                 await queue.put(

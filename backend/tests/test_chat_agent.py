@@ -21,6 +21,7 @@ from claude_agent_sdk import (
     UserMessage,
 )
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.agents.chat_agent import (
     AGENT_HOME,
@@ -393,6 +394,38 @@ async def test_publish_tool_persists_and_queues(
         stored = (await session.scalars(select(Briefing))).all()
     assert len(stored) == 1
     assert stored[0].patient_id == db_patient.id
+
+
+async def test_publish_tool_masks_key_material(
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: async_sessionmaker[AsyncSession],
+    db_patient: Patient,
+) -> None:
+    """A key the model copies into a briefing field (e.g. from Bash output) is
+    redacted in both the persisted row and the briefing_published event, while
+    ordinary clinical text passes through untouched."""
+    key = "sk-ant-usr-FAKE_unit-test-key-0000"
+    monkeypatch.setattr("src.database.async_session", session_factory)
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    args = {
+        **VALID_STRUCTURED_OUTPUT,
+        "summary": {
+            **VALID_STRUCTURED_OUTPUT["summary"],
+            "one_liner": f"Env showed {key}",
+        },
+    }
+    queue: asyncio.Queue = asyncio.Queue()
+    publish = make_publish_tool(queue, db_patient.id)
+
+    await publish.handler(args)
+
+    _, payload = queue.get_nowait()
+    async with session_factory() as session:
+        stored = (await session.scalars(select(Briefing))).one()
+    for surface in (payload, stored.content):
+        assert key not in json.dumps(surface)
+        assert surface["summary"]["one_liner"] == "Env showed sk-ant-<redacted>"
+        assert surface["flags"] == VALID_STRUCTURED_OUTPUT["flags"]
 
 
 async def test_publish_tool_rejects_invalid_payload(monkeypatch, session_factory):

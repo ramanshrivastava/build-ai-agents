@@ -124,6 +124,13 @@ def make_publish_tool(queue: Queue[ChatEvent], patient_id: int):
                 "isError": True,
             }
 
+        # Mask once, before persisting or streaming: the model could copy a
+        # key it saw in tool output (e.g. Bash `env`) into any briefing field.
+        # Re-validating keeps the schema contract for the masked copy.
+        briefing = PatientBriefing.model_validate(
+            _masked_payload(briefing.model_dump(mode="json"))
+        )
+
         async with async_session() as session:
             stored = await store_briefing(
                 session, patient_id, briefing.model_dump(mode="json")
