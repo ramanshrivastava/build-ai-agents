@@ -17,6 +17,7 @@ from claude_agent_sdk import (
     query,
 )
 
+from src.agents.cli_env import cli_env
 from src.config import settings
 from src.models.orm import Patient
 from src.models.schemas import BriefingResponse, PatientBriefing
@@ -134,6 +135,7 @@ async def _generate_briefing_v1(patient: Patient) -> BriefingResponse:
         },
         max_turns=2,
         permission_mode="bypassPermissions",
+        env=cli_env(),
     )
 
     logger.info(

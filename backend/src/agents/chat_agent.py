@@ -55,7 +55,8 @@ from claude_agent_sdk import (
 )
 from pydantic import ValidationError
 
-from src.agents.briefing_agent import _http_mcp_servers, _proxy_env
+from src.agents.briefing_agent import _http_mcp_servers
+from src.agents.cli_env import cli_env
 from src.config import settings
 from src.models.schemas import BriefingResponse, PatientBriefing
 from src.services.briefing_service import BriefingGenerationError
@@ -175,7 +176,7 @@ def build_chat_options(
         "mcp__guidelines__search_clinical_guidelines",
         "mcp__publisher__publish_briefing",
     ]
-    env = _proxy_env()
+    env = cli_env()
     if settings.firecrawl_api_key:
         # Fourth tool-integration pattern in this repo: skill + CLI via Bash
         # (vs in-process MCP, HTTP MCP, and managed tools). The web-research
@@ -230,16 +231,20 @@ RESULT_PREVIEW_LIMIT = 600
 # we scrub it before anything reaches the SSE stream or the persisted trace.
 _FC_KEY_RE = re.compile(r"fc-[A-Za-z0-9]{6,}")
 _ANTHROPIC_KEY_RE = re.compile(r"sk-ant-[A-Za-z0-9_-]{6,}")
+# Exact-value masking only applies to configured keys at least this long: a
+# short placeholder (e.g. "test" in a dev .env) would otherwise rewrite
+# ordinary words in the transcript. Real keys are far longer.
+_MIN_EXACT_MASK_LEN = 20
 
 
 def _mask_key_material(text: str) -> str:
     # Exact-match first: self-hosted Firecrawl keys may not match the fc-
     # pattern, but we always know the configured value. Anthropic first so the
     # fc- pattern can never bite into the middle of an sk-ant- key.
-    if settings.anthropic_api_key:
+    if len(settings.anthropic_api_key) >= _MIN_EXACT_MASK_LEN:
         text = text.replace(settings.anthropic_api_key, "sk-ant-<redacted>")
     text = _ANTHROPIC_KEY_RE.sub("sk-ant-<redacted>", text)
-    if settings.firecrawl_api_key:
+    if len(settings.firecrawl_api_key) >= _MIN_EXACT_MASK_LEN:
         text = text.replace(settings.firecrawl_api_key, "fc-<redacted>")
     return _FC_KEY_RE.sub("fc-<redacted>", text)
 
@@ -254,7 +259,9 @@ def _result_preview(content: Any) -> str:
 
     Content arrives as a plain string or a list of content dicts; anything
     beyond the preview limit is truncated — the full result already reached
-    the model, this copy is only for the UI trace.
+    the model, this copy is only for the UI trace. Masking runs before the
+    cut: truncating first could split a key at the boundary, and the
+    exact-value match would then miss the surviving prefix.
     """
     if content is None:
         return ""
@@ -266,9 +273,10 @@ def _result_preview(content: Any) -> str:
             for d in content
             if isinstance(d, dict) and d.get("type") == "text"
         )
+    text = _mask_key_material(text)
     if len(text) > RESULT_PREVIEW_LIMIT:
         text = text[:RESULT_PREVIEW_LIMIT] + "…"
-    return _mask_key_material(text)
+    return text
 
 
 async def drive_chat_turn(

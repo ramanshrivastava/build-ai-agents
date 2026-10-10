@@ -45,7 +45,7 @@ from claude_agent_sdk import (
 # Make `src` importable when run as `python scripts/chat_smoke.py`.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.agents.briefing_agent import _proxy_env  # noqa: E402
+from src.agents.cli_env import cli_env  # noqa: E402
 from src.config import settings  # noqa: E402
 
 TURN_TIMEOUT = 180  # seconds per model turn — Gemini via proxy can be slow
@@ -67,7 +67,7 @@ def _base_options(**overrides: Any) -> ClaudeAgentOptions:
     """Minimal options mirroring what the chat agent will use."""
     defaults: dict[str, Any] = {
         "model": settings.ai_model,
-        "env": _proxy_env(),
+        "env": cli_env(),
         "permission_mode": "bypassPermissions",
         "max_turns": 4,
     }

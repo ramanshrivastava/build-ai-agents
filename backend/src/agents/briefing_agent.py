@@ -27,6 +27,7 @@ from claude_agent_sdk import (
     query,
 )
 
+from src.agents.cli_env import cli_env
 from src.agents.tools import search_clinical_guidelines
 from src.config import settings
 from src.models.orm import Patient
@@ -185,38 +186,6 @@ async def _as_stream(text: str) -> AsyncIterator[dict[str, Any]]:
     yield {"type": "user", "message": {"role": "user", "content": text}}
 
 
-def _proxy_env() -> dict[str, str]:
-    """Env vars for the spawned Claude Code CLI subprocess: either direct
-    Anthropic auth, or routing through the configured translation proxy (e.g.
-    LiteLLM → Vertex Gemini).
-
-    Without ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY is passed through so the CLI
-    bills that key instead of the developer's Claude Code login (empty when no
-    key is configured — the CLI then falls back to the login). pydantic-settings
-    reads .env into Settings, NOT os.environ, so this explicit injection is
-    required. With a proxy, the proxy branch mirrors the per-process env the
-    `glm` shell function sets, and the real Anthropic key is deliberately NOT
-    forwarded — the proxy only gets its own token. The SDK merges this over
-    os.environ when spawning the CLI (`{**os.environ, **options.env}`), so it
-    overrides cleanly without mutating the current process. Only the SDK paths
-    use this; the Managed Agents path cannot be re-pointed (server-hosted by
-    Anthropic).
-    """
-    if not settings.anthropic_base_url:
-        if not settings.anthropic_api_key:
-            return {}
-        return {"ANTHROPIC_API_KEY": settings.anthropic_api_key}
-    return {
-        "ANTHROPIC_BASE_URL": settings.anthropic_base_url,
-        "ANTHROPIC_AUTH_TOKEN": settings.anthropic_auth_token or "dummy",
-        # Map every Claude tier the CLI may resolve internally onto the proxy
-        # model name, so no background call escapes to real Anthropic.
-        "ANTHROPIC_DEFAULT_OPUS_MODEL": settings.ai_model,
-        "ANTHROPIC_DEFAULT_SONNET_MODEL": settings.ai_model,
-        "ANTHROPIC_DEFAULT_HAIKU_MODEL": settings.ai_model,
-    }
-
-
 def _build_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
     """Build the agent options shared by every tool path.
 
@@ -234,7 +203,7 @@ def _build_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
         },
         max_turns=4,
         permission_mode="bypassPermissions",
-        env=_proxy_env(),
+        env=cli_env(),
     )
 
 
@@ -428,7 +397,7 @@ def _build_followup_options(mcp_servers: dict[str, Any]) -> ClaudeAgentOptions:
         allowed_tools=["mcp__briefing__search_clinical_guidelines"],
         max_turns=4,
         permission_mode="bypassPermissions",
-        env=_proxy_env(),
+        env=cli_env(),
     )
 
 

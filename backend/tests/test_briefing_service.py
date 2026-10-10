@@ -151,6 +151,24 @@ async def test_generate_briefing_cli_not_found(mock_query, _mock_qdrant, fake_pa
     assert exc_info.value.code == "CLI_NOT_FOUND"
 
 
+@patch("src.services.briefing_service._qdrant_available", return_value=False)
+@patch("src.services.briefing_service.query")
+async def test_generate_briefing_v1_carries_cli_env(
+    mock_query, _mock_qdrant, fake_patient, monkeypatch
+):
+    """The V1 fallback bills the configured key like the RAG paths do, instead
+    of silently falling back to the Claude Code login."""
+    monkeypatch.setattr("src.config.settings.anthropic_base_url", "")
+    monkeypatch.setattr("src.config.settings.anthropic_api_key", "sk-ant-unit-test")
+    msg = _make_result_message(structured_output=VALID_STRUCTURED_OUTPUT)
+    mock_query.return_value = _async_iter([msg])
+
+    await generate_briefing(fake_patient)
+
+    options = mock_query.call_args.kwargs["options"]
+    assert options.env == {"ANTHROPIC_API_KEY": "sk-ant-unit-test"}
+
+
 # --- Tests (RAG path — Qdrant available) ---
 
 

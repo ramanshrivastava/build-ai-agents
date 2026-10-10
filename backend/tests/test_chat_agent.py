@@ -278,6 +278,38 @@ def test_anthropic_key_masked_in_events(monkeypatch: pytest.MonkeyPatch) -> None
     )
 
 
+def test_result_preview_masks_key_straddling_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A configured key crossing the preview cut is masked before truncation,
+    so no prefix of it survives in the preview."""
+    from src.agents.chat_agent import RESULT_PREVIEW_LIMIT, _result_preview
+
+    key = "custom-key-no-prefix-0000"
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    text = "x" * (RESULT_PREVIEW_LIMIT - 10) + key + " tail"
+
+    preview = _result_preview(text)
+
+    assert key[:10] not in preview
+    assert preview.endswith("…")
+
+
+def test_short_configured_keys_do_not_mangle_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Placeholder keys like "test" are too short for exact-value masking —
+    replacing them would rewrite ordinary words in the transcript."""
+    from src.agents.chat_agent import _mask_key_material
+
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", "test")
+    monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "local")
+    assert (
+        _mask_key_material("run the test suite against a local server")
+        == "run the test suite against a local server"
+    )
+
+
 @patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
 async def test_anthropic_key_never_reaches_events_or_trace(
     monkeypatch: pytest.MonkeyPatch,
