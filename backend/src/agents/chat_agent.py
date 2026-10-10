@@ -190,6 +190,12 @@ def build_chat_options(
         # Note: permission_mode="bypassPermissions" already auto-approves any
         # requested tool; listing Bash here documents intent rather than
         # granting anything new.
+        # Known risk (accepted for local/dev use): Bash children inherit the
+        # CLI env — FIRECRAWL_API_KEY and, when configured, ANTHROPIC_API_KEY —
+        # so a prompt injection in scraped content could exfiltrate either.
+        # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB was evaluated and rejected: a no-op
+        # on the SDK-bundled CLI, and newer CLIs also strip FIRECRAWL_API_KEY
+        # and force the default permission mode.
         allowed_tools.append("Bash")
     return ClaudeAgentOptions(
         system_prompt=f"{CHAT_SYSTEM_PROMPT}\nPATIENT RECORD (JSON):\n{patient_json}",
