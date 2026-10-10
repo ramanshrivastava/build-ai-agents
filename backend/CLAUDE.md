@@ -140,8 +140,12 @@ directly and spawns no CLI.
 
 Required in `.env` (see `.env.example`):
 ```
-# Optional locally (SDK proxies through Claude Code CLI).
+# Optional locally: when empty, the SDK agents fall back to your Claude Code
+# login. When set, the SDK agents (via the spawned CLI) and Managed Agents
+# both bill this key. Never forwarded to an ANTHROPIC_BASE_URL proxy.
 # Required for production/deployed use.
+# With FIRECRAWL_API_KEY set, the chat agent's Bash can read this key — prefer
+# a low-limit dev key.
 ANTHROPIC_API_KEY=
 AI_MODEL=claude-opus-4-6
 DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/build_ai_agents

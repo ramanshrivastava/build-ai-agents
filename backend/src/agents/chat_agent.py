@@ -55,7 +55,8 @@ from claude_agent_sdk import (
 )
 from pydantic import ValidationError
 
-from src.agents.briefing_agent import _http_mcp_servers, _proxy_env
+from src.agents.briefing_agent import _http_mcp_servers
+from src.agents.cli_env import cli_env
 from src.config import settings
 from src.models.schemas import BriefingResponse, PatientBriefing
 from src.services.briefing_service import BriefingGenerationError
@@ -123,6 +124,13 @@ def make_publish_tool(queue: Queue[ChatEvent], patient_id: int):
                 "isError": True,
             }
 
+        # Mask once, before persisting or streaming: the model could copy a
+        # key it saw in tool output (e.g. Bash `env`) into any briefing field.
+        # Re-validating keeps the schema contract for the masked copy.
+        briefing = PatientBriefing.model_validate(
+            _masked_payload(briefing.model_dump(mode="json"))
+        )
+
         async with async_session() as session:
             stored = await store_briefing(
                 session, patient_id, briefing.model_dump(mode="json")
@@ -175,7 +183,7 @@ def build_chat_options(
         "mcp__guidelines__search_clinical_guidelines",
         "mcp__publisher__publish_briefing",
     ]
-    env = _proxy_env()
+    env = cli_env()
     if settings.firecrawl_api_key:
         # Fourth tool-integration pattern in this repo: skill + CLI via Bash
         # (vs in-process MCP, HTTP MCP, and managed tools). The web-research
@@ -189,6 +197,12 @@ def build_chat_options(
         # Note: permission_mode="bypassPermissions" already auto-approves any
         # requested tool; listing Bash here documents intent rather than
         # granting anything new.
+        # Known risk (accepted for local/dev use): Bash children inherit the
+        # CLI env — FIRECRAWL_API_KEY and, when configured, ANTHROPIC_API_KEY —
+        # so a prompt injection in scraped content could exfiltrate either.
+        # CLAUDE_CODE_SUBPROCESS_ENV_SCRUB was evaluated and rejected: a no-op
+        # on the SDK-bundled CLI, and newer CLIs also strip FIRECRAWL_API_KEY
+        # and force the default permission mode.
         allowed_tools.append("Bash")
     return ClaudeAgentOptions(
         system_prompt=f"{CHAT_SYSTEM_PROMPT}\nPATIENT RECORD (JSON):\n{patient_json}",
@@ -224,17 +238,26 @@ def _short_tool_name(name: str) -> str:
 
 RESULT_PREVIEW_LIMIT = 600
 
-# Firecrawl keys are fc-<hex>. Defense-in-depth: the key should only ever live
-# in the subprocess environment, but if the model echoes one (e.g. from a CLI
-# error message) we scrub it before anything reaches the SSE stream or the
-# persisted trace.
+# Firecrawl keys are fc-<hex>; Anthropic keys are sk-ant-<...>. Defense-in-depth:
+# both live only in the subprocess environment (where Bash children can read
+# them), but if the model echoes one (e.g. from a CLI error message or `env`)
+# we scrub it before anything reaches the SSE stream or the persisted trace.
 _FC_KEY_RE = re.compile(r"fc-[A-Za-z0-9]{6,}")
+_ANTHROPIC_KEY_RE = re.compile(r"sk-ant-[A-Za-z0-9_-]{6,}")
+# Exact-value masking only applies to configured keys at least this long: a
+# short placeholder (e.g. "test" in a dev .env) would otherwise rewrite
+# ordinary words in the transcript. Real keys are far longer.
+_MIN_EXACT_MASK_LEN = 20
 
 
 def _mask_key_material(text: str) -> str:
     # Exact-match first: self-hosted Firecrawl keys may not match the fc-
-    # pattern, but we always know the configured value.
-    if settings.firecrawl_api_key:
+    # pattern, but we always know the configured value. Anthropic first so the
+    # fc- pattern can never bite into the middle of an sk-ant- key.
+    if len(settings.anthropic_api_key) >= _MIN_EXACT_MASK_LEN:
+        text = text.replace(settings.anthropic_api_key, "sk-ant-<redacted>")
+    text = _ANTHROPIC_KEY_RE.sub("sk-ant-<redacted>", text)
+    if len(settings.firecrawl_api_key) >= _MIN_EXACT_MASK_LEN:
         text = text.replace(settings.firecrawl_api_key, "fc-<redacted>")
     return _FC_KEY_RE.sub("fc-<redacted>", text)
 
@@ -249,7 +272,9 @@ def _result_preview(content: Any) -> str:
 
     Content arrives as a plain string or a list of content dicts; anything
     beyond the preview limit is truncated — the full result already reached
-    the model, this copy is only for the UI trace.
+    the model, this copy is only for the UI trace. Masking runs before the
+    cut: truncating first could split a key at the boundary, and the
+    exact-value match would then miss the surviving prefix.
     """
     if content is None:
         return ""
@@ -261,9 +286,10 @@ def _result_preview(content: Any) -> str:
             for d in content
             if isinstance(d, dict) and d.get("type") == "text"
         )
+    text = _mask_key_material(text)
     if len(text) > RESULT_PREVIEW_LIMIT:
         text = text[:RESULT_PREVIEW_LIMIT] + "…"
-    return _mask_key_material(text)
+    return text
 
 
 async def drive_chat_turn(
@@ -305,9 +331,12 @@ async def drive_chat_turn(
                             await queue.put(("text", {"text": text}))
                         elif isinstance(block, ThinkingBlock):
                             # Reasoning tokens (when the model/proxy surfaces
-                            # them) — streamed and persisted like any part.
-                            trace.append({"type": "thinking", "text": block.thinking})
-                            await queue.put(("thinking", {"text": block.thinking}))
+                            # them) — streamed and persisted like any part,
+                            # masked like text: reasoning can quote a key the
+                            # model saw in tool output (e.g. `env`).
+                            thinking = _mask_key_material(block.thinking)
+                            trace.append({"type": "thinking", "text": thinking})
+                            await queue.put(("thinking", {"text": thinking}))
                         elif isinstance(block, ToolUseBlock):
                             short = _short_tool_name(block.name)
                             # publish_briefing's input is the entire briefing;

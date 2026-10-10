@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime
+import json
 
 from unittest.mock import patch
 
@@ -20,6 +21,7 @@ from claude_agent_sdk import (
     UserMessage,
 )
 from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from src.agents.chat_agent import (
     AGENT_HOME,
@@ -260,6 +262,102 @@ def test_key_material_masked_in_events() -> None:
     assert "fc-<redacted>" in _result_preview("error: bad key fc-1111fake1111")
 
 
+def test_anthropic_key_masked_in_events(monkeypatch: pytest.MonkeyPatch) -> None:
+    """sk-ant- keys (now in the subprocess env, so `env` in Bash can print
+    them) are scrubbed by pattern and by exact configured value."""
+    from src.agents.chat_agent import _mask_key_material, _result_preview
+
+    monkeypatch.setattr(
+        "src.agents.chat_agent.settings.anthropic_api_key", "custom-key-no-prefix"
+    )
+    assert (
+        _mask_key_material("ANTHROPIC_API_KEY=sk-ant-usr-AAAA_fake-BBBB\nX=1")
+        == "ANTHROPIC_API_KEY=sk-ant-<redacted>\nX=1"
+    )
+    assert "custom-key-no-prefix" not in _result_preview(
+        "env: KEY=custom-key-no-prefix"
+    )
+
+
+def test_result_preview_masks_key_straddling_truncation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A configured key crossing the preview cut is masked before truncation,
+    so no prefix of it survives in the preview."""
+    from src.agents.chat_agent import RESULT_PREVIEW_LIMIT, _result_preview
+
+    key = "custom-key-no-prefix-0000"
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    text = "x" * (RESULT_PREVIEW_LIMIT - 10) + key + " tail"
+
+    preview = _result_preview(text)
+
+    assert key[:10] not in preview
+    assert preview.endswith("…")
+
+
+def test_short_configured_keys_do_not_mangle_text(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Placeholder keys like "test" are too short for exact-value masking —
+    replacing them would rewrite ordinary words in the transcript."""
+    from src.agents.chat_agent import _mask_key_material
+
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", "test")
+    monkeypatch.setattr("src.agents.chat_agent.settings.firecrawl_api_key", "local")
+    assert (
+        _mask_key_material("run the test suite against a local server")
+        == "run the test suite against a local server"
+    )
+
+
+@patch("src.agents.chat_agent.ClaudeSDKClient", FakeClient)
+async def test_anthropic_key_never_reaches_events_or_trace(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """End to end through drive_chat_turn: a key surfacing in any projection
+    (thinking, text, tool input, tool result) is redacted in every SSE event,
+    the persisted trace, and the returned text."""
+    key = "sk-ant-usr-FAKE_unit-test-key-0000"
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    FakeClient.messages = [
+        AssistantMessage(
+            content=[
+                ThinkingBlock(thinking=f"env printed {key}", signature="sig"),
+                TextBlock(text=f"Your key is {key}"),
+                ToolUseBlock(id="t1", name="Bash", input={"command": f"echo {key}"}),
+            ],
+            model="test-model",
+        ),
+        UserMessage(
+            content=[
+                ToolResultBlock(
+                    tool_use_id="t1",
+                    content=[{"type": "text", "text": f"ANTHROPIC_API_KEY={key}"}],
+                    is_error=False,
+                )
+            ]
+        ),
+        _result(),
+    ]
+    queue: asyncio.Queue = asyncio.Queue()
+    options = build_chat_options(queue, 1, None, "{}")
+
+    _, text, trace = await drive_chat_turn("hello", options, queue)
+
+    events = [queue.get_nowait() for _ in range(queue.qsize())]
+    assert [kind for kind, _ in events] == [
+        "thinking",
+        "text",
+        "tool_use",
+        "tool_result",
+    ]
+    for surface in (events, trace, text):
+        dumped = json.dumps(surface)
+        assert key not in dumped
+        assert "sk-ant-<redacted>" in dumped
+
+
 # --- publish_briefing tool handler ---
 
 
@@ -296,6 +394,38 @@ async def test_publish_tool_persists_and_queues(
         stored = (await session.scalars(select(Briefing))).all()
     assert len(stored) == 1
     assert stored[0].patient_id == db_patient.id
+
+
+async def test_publish_tool_masks_key_material(
+    monkeypatch: pytest.MonkeyPatch,
+    session_factory: async_sessionmaker[AsyncSession],
+    db_patient: Patient,
+) -> None:
+    """A key the model copies into a briefing field (e.g. from Bash output) is
+    redacted in both the persisted row and the briefing_published event, while
+    ordinary clinical text passes through untouched."""
+    key = "sk-ant-usr-FAKE_unit-test-key-0000"
+    monkeypatch.setattr("src.database.async_session", session_factory)
+    monkeypatch.setattr("src.agents.chat_agent.settings.anthropic_api_key", key)
+    args = {
+        **VALID_STRUCTURED_OUTPUT,
+        "summary": {
+            **VALID_STRUCTURED_OUTPUT["summary"],
+            "one_liner": f"Env showed {key}",
+        },
+    }
+    queue: asyncio.Queue = asyncio.Queue()
+    publish = make_publish_tool(queue, db_patient.id)
+
+    await publish.handler(args)
+
+    _, payload = queue.get_nowait()
+    async with session_factory() as session:
+        stored = (await session.scalars(select(Briefing))).one()
+    for surface in (payload, stored.content):
+        assert key not in json.dumps(surface)
+        assert surface["summary"]["one_liner"] == "Env showed sk-ant-<redacted>"
+        assert surface["flags"] == VALID_STRUCTURED_OUTPUT["flags"]
 
 
 async def test_publish_tool_rejects_invalid_payload(monkeypatch, session_factory):

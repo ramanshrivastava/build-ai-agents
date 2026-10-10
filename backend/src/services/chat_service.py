@@ -19,7 +19,12 @@ from collections.abc import AsyncIterator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.agents.chat_agent import ChatEvent, build_chat_options, drive_chat_turn
+from src.agents.chat_agent import (
+    ChatEvent,
+    _mask_key_material,
+    build_chat_options,
+    drive_chat_turn,
+)
 from src.models.orm import Briefing, Conversation, ConversationMessage, Patient
 from src.models.schemas import (
     BriefingResponse,
@@ -154,8 +159,18 @@ async def stream_chat_turn(
                 await session.commit()
                 await queue.put(("done", {"session_id": session_id}))
             except BriefingGenerationError as exc:
-                logger.exception("Chat turn failed for patient %d", patient.id)
-                await queue.put(("error", {"code": exc.code, "message": exc.message}))
+                # Error messages can quote CLI/model output (e.g. an auth
+                # failure echoing the key), so mask like every other event —
+                # and log without the traceback, whose text repeats the raw
+                # message.
+                masked = _mask_key_material(exc.message)
+                logger.error(
+                    "Chat turn failed for patient %d (%s): %s",
+                    patient.id,
+                    exc.code,
+                    masked,
+                )
+                await queue.put(("error", {"code": exc.code, "message": masked}))
             except Exception:
                 logger.exception("Unexpected chat error for patient %d", patient.id)
                 await queue.put(
